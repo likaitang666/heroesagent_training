@@ -1,0 +1,25 @@
+# 训练输出 (模型文件较大)
+outputs/
+
+# 大图片数据集 (用户自行准备)
+data/images/
+data/annotations/
+data/creature_image_mapping.xlsx
+data/_thumbnails/
+
+# 截图数据
+data/screenshots/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# IDE
+.vscode/
+.idea/

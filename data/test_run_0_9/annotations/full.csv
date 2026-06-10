@@ -1,0 +1,111 @@
+image,label_index,name_en,name_zh,faction,level,is_upgraded
+0_0.png,0,Pikeman,枪兵,Castle,1,False
+0_0_aug01.png,0,Pikeman,枪兵,Castle,1,False
+0_0_aug02.png,0,Pikeman,枪兵,Castle,1,False
+0_0_aug03.png,0,Pikeman,枪兵,Castle,1,False
+0_0_aug04.png,0,Pikeman,枪兵,Castle,1,False
+0_0_aug05.png,0,Pikeman,枪兵,Castle,1,False
+0_0_aug06.png,0,Pikeman,枪兵,Castle,1,False
+0_0_aug07.png,0,Pikeman,枪兵,Castle,1,False
+0_0_aug08.png,0,Pikeman,枪兵,Castle,1,False
+0_0_aug09.png,0,Pikeman,枪兵,Castle,1,False
+0_1.png,0,Pikeman,枪兵,Castle,1,False
+0_1_aug01.png,0,Pikeman,枪兵,Castle,1,False
+0_1_aug02.png,0,Pikeman,枪兵,Castle,1,False
+0_1_aug03.png,0,Pikeman,枪兵,Castle,1,False
+0_1_aug04.png,0,Pikeman,枪兵,Castle,1,False
+0_1_aug05.png,0,Pikeman,枪兵,Castle,1,False
+0_1_aug06.png,0,Pikeman,枪兵,Castle,1,False
+0_1_aug07.png,0,Pikeman,枪兵,Castle,1,False
+0_1_aug08.png,0,Pikeman,枪兵,Castle,1,False
+0_1_aug09.png,0,Pikeman,枪兵,Castle,1,False
+1_0.png,1,Halberdier,戟兵,Castle,1,True
+1_0_aug01.png,1,Halberdier,戟兵,Castle,1,True
+1_0_aug02.png,1,Halberdier,戟兵,Castle,1,True
+1_0_aug03.png,1,Halberdier,戟兵,Castle,1,True
+1_0_aug04.png,1,Halberdier,戟兵,Castle,1,True
+1_0_aug05.png,1,Halberdier,戟兵,Castle,1,True
+1_0_aug06.png,1,Halberdier,戟兵,Castle,1,True
+1_0_aug07.png,1,Halberdier,戟兵,Castle,1,True
+1_0_aug08.png,1,Halberdier,戟兵,Castle,1,True
+1_0_aug09.png,1,Halberdier,戟兵,Castle,1,True
+2_0.png,2,Archer,弩箭手,Castle,2,False
+2_0_aug01.png,2,Archer,弩箭手,Castle,2,False
+2_0_aug02.png,2,Archer,弩箭手,Castle,2,False
+2_0_aug03.png,2,Archer,弩箭手,Castle,2,False
+2_0_aug04.png,2,Archer,弩箭手,Castle,2,False
+2_0_aug05.png,2,Archer,弩箭手,Castle,2,False
+2_0_aug06.png,2,Archer,弩箭手,Castle,2,False
+2_0_aug07.png,2,Archer,弩箭手,Castle,2,False
+2_0_aug08.png,2,Archer,弩箭手,Castle,2,False
+2_0_aug09.png,2,Archer,弩箭手,Castle,2,False
+3_0.png,3,Marksman,重弩手,Castle,2,True
+3_0_aug01.png,3,Marksman,重弩手,Castle,2,True
+3_0_aug02.png,3,Marksman,重弩手,Castle,2,True
+3_0_aug03.png,3,Marksman,重弩手,Castle,2,True
+3_0_aug04.png,3,Marksman,重弩手,Castle,2,True
+3_0_aug05.png,3,Marksman,重弩手,Castle,2,True
+3_0_aug06.png,3,Marksman,重弩手,Castle,2,True
+3_0_aug07.png,3,Marksman,重弩手,Castle,2,True
+3_0_aug08.png,3,Marksman,重弩手,Castle,2,True
+3_0_aug09.png,3,Marksman,重弩手,Castle,2,True
+4_0.png,4,Griffin,狮鹫,Castle,3,False
+4_0_aug01.png,4,Griffin,狮鹫,Castle,3,False
+4_0_aug02.png,4,Griffin,狮鹫,Castle,3,False
+4_0_aug03.png,4,Griffin,狮鹫,Castle,3,False
+4_0_aug04.png,4,Griffin,狮鹫,Castle,3,False
+4_0_aug05.png,4,Griffin,狮鹫,Castle,3,False
+4_0_aug06.png,4,Griffin,狮鹫,Castle,3,False
+4_0_aug07.png,4,Griffin,狮鹫,Castle,3,False
+4_0_aug08.png,4,Griffin,狮鹫,Castle,3,False
+4_0_aug09.png,4,Griffin,狮鹫,Castle,3,False
+5_0.png,5,Royal Griffin,皇家狮鹫,Castle,3,True
+5_0_aug01.png,5,Royal Griffin,皇家狮鹫,Castle,3,True
+5_0_aug02.png,5,Royal Griffin,皇家狮鹫,Castle,3,True
+5_0_aug03.png,5,Royal Griffin,皇家狮鹫,Castle,3,True
+5_0_aug04.png,5,Royal Griffin,皇家狮鹫,Castle,3,True
+5_0_aug05.png,5,Royal Griffin,皇家狮鹫,Castle,3,True
+5_0_aug06.png,5,Royal Griffin,皇家狮鹫,Castle,3,True
+5_0_aug07.png,5,Royal Griffin,皇家狮鹫,Castle,3,True
+5_0_aug08.png,5,Royal Griffin,皇家狮鹫,Castle,3,True
+5_0_aug09.png,5,Royal Griffin,皇家狮鹫,Castle,3,True
+6_0.png,6,Swordsman,剑士,Castle,4,False
+6_0_aug01.png,6,Swordsman,剑士,Castle,4,False
+6_0_aug02.png,6,Swordsman,剑士,Castle,4,False
+6_0_aug03.png,6,Swordsman,剑士,Castle,4,False
+6_0_aug04.png,6,Swordsman,剑士,Castle,4,False
+6_0_aug05.png,6,Swordsman,剑士,Castle,4,False
+6_0_aug06.png,6,Swordsman,剑士,Castle,4,False
+6_0_aug07.png,6,Swordsman,剑士,Castle,4,False
+6_0_aug08.png,6,Swordsman,剑士,Castle,4,False
+6_0_aug09.png,6,Swordsman,剑士,Castle,4,False
+7_0.png,7,Crusader,十字军,Castle,4,True
+7_0_aug01.png,7,Crusader,十字军,Castle,4,True
+7_0_aug02.png,7,Crusader,十字军,Castle,4,True
+7_0_aug03.png,7,Crusader,十字军,Castle,4,True
+7_0_aug04.png,7,Crusader,十字军,Castle,4,True
+7_0_aug05.png,7,Crusader,十字军,Castle,4,True
+7_0_aug06.png,7,Crusader,十字军,Castle,4,True
+7_0_aug07.png,7,Crusader,十字军,Castle,4,True
+7_0_aug08.png,7,Crusader,十字军,Castle,4,True
+7_0_aug09.png,7,Crusader,十字军,Castle,4,True
+8_0.png,8,Monk,僧侣,Castle,5,False
+8_0_aug01.png,8,Monk,僧侣,Castle,5,False
+8_0_aug02.png,8,Monk,僧侣,Castle,5,False
+8_0_aug03.png,8,Monk,僧侣,Castle,5,False
+8_0_aug04.png,8,Monk,僧侣,Castle,5,False
+8_0_aug05.png,8,Monk,僧侣,Castle,5,False
+8_0_aug06.png,8,Monk,僧侣,Castle,5,False
+8_0_aug07.png,8,Monk,僧侣,Castle,5,False
+8_0_aug08.png,8,Monk,僧侣,Castle,5,False
+8_0_aug09.png,8,Monk,僧侣,Castle,5,False
+9_0.png,9,Zealot,狂信徒,Castle,5,True
+9_0_aug01.png,9,Zealot,狂信徒,Castle,5,True
+9_0_aug02.png,9,Zealot,狂信徒,Castle,5,True
+9_0_aug03.png,9,Zealot,狂信徒,Castle,5,True
+9_0_aug04.png,9,Zealot,狂信徒,Castle,5,True
+9_0_aug05.png,9,Zealot,狂信徒,Castle,5,True
+9_0_aug06.png,9,Zealot,狂信徒,Castle,5,True
+9_0_aug07.png,9,Zealot,狂信徒,Castle,5,True
+9_0_aug08.png,9,Zealot,狂信徒,Castle,5,True
+9_0_aug09.png,9,Zealot,狂信徒,Castle,5,True
