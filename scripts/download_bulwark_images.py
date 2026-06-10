@@ -13,7 +13,8 @@ import urllib.request
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-IMAGES_DST = PROJECT_ROOT / "training" / "data" / "images"
+TRAINING_ROOT = Path(__file__).parent.parent  # 训练模块根目录 (文件夹名无关)
+IMAGES_DST = TRAINING_ROOT / "data" / "images"
 IMAGES_SRC = PROJECT_ROOT / "images" / "creatures"
 LABELS_FILE = PROJECT_ROOT / "gamedata" / "creature_labels.json"
 

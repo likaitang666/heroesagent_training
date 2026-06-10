@@ -72,7 +72,7 @@ if torch.cuda.is_available():
 # 将 data_dir 改为你的数据集路径
 # Dataset 内路径格式: /kaggle/input/your-dataset/data/
 !python scripts/train.py \
-    --data_dir /kaggle/input/herosagent-training/data \
+    --data_dir /kaggle/input/herosagent_training/data \
     --model efficientnet_b0 \
     --epochs 50 \
     --batch_size 64 \

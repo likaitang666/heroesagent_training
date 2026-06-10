@@ -9,7 +9,8 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-IMAGES_DIR = PROJECT_ROOT / "training" / "data" / "images"
+TRAINING_ROOT = Path(__file__).parent.parent  # 训练模块根目录 (文件夹名无关)
+IMAGES_DIR = TRAINING_ROOT / "data" / "images"
 
 
 def rename_folder(folder: Path, label_idx: int, dry_run: bool = False) -> int:

@@ -39,13 +39,13 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-TRAINING_ROOT = PROJECT_ROOT / "training"
+TRAINING_ROOT = Path(__file__).parent.parent  # 训练模块根目录 (文件夹名无关)
 DEFAULT_DATA_DIR = TRAINING_ROOT / "data"
 OUTPUTS_DIR = TRAINING_ROOT / "outputs"
 
-sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(TRAINING_ROOT / "scripts"))
 
-from training.scripts.dataset import CreatureDataset, get_default_transforms
+from dataset import CreatureDataset, get_default_transforms
 
 
 # ============================================================

@@ -27,11 +27,11 @@ from collections import defaultdict
 from typing import Optional
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-TRAINING_ROOT = PROJECT_ROOT / "training"
+TRAINING_ROOT = Path(__file__).parent.parent  # 训练模块根目录 (文件夹名无关)
 IMAGES_DIR = TRAINING_ROOT / "data" / "images"
 ANNOTATIONS_DIR = TRAINING_ROOT / "data" / "annotations"
 
-sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(TRAINING_ROOT / "scripts"))
 
 
 def stratified_split(

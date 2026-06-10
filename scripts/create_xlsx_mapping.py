@@ -14,11 +14,12 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
+TRAINING_ROOT = Path(__file__).parent.parent  # 训练模块根目录 (文件夹名无关)
 sys.path.insert(0, str(PROJECT_ROOT))
 
 IMAGES_DIR = PROJECT_ROOT / "images" / "creatures"
 LABELS_FILE = PROJECT_ROOT / "gamedata" / "creature_labels.json"
-OUTPUT_XLSX = PROJECT_ROOT / "training" / "data" / "creature_image_mapping.xlsx"
+OUTPUT_XLSX = TRAINING_ROOT / "data" / "creature_image_mapping.xlsx"
 SPARSE_VECTORS_OUT = PROJECT_ROOT / "gamedata" / "creature_sparse_vectors.py"
 
 
@@ -98,7 +99,7 @@ def create_xlsx(rows: list[dict[str, Any]]) -> None:
         _create_csv_fallback(rows)
         return
 
-    TEMP_DIR = PROJECT_ROOT / "training" / "data" / "_thumbnails"
+    TEMP_DIR = TRAINING_ROOT / "data" / "_thumbnails"
     TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
     wb = Workbook()
