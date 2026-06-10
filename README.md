@@ -48,43 +48,16 @@ python scripts/train.py --evaluate outputs/best_efficientnet_b0.pth --data_dir d
 | 推荐模型 | EfficientNet-B0 (5.3M 参数) |
 | 推荐 Batch Size | 64 (约 8GB 显存) |
 
-### 方式一: git clone（推荐）
+### Step 1: 上传数据到 Kaggle
 
-直接将仓库克隆到 `/kaggle/working/` 目录，无需上传 Dataset:
-
-```python
-# ========== Cell 1: 环境准备 ==========
-import os
-import sys
-import torch
-
-print(f"PyTorch: {torch.__version__}")
-print(f"CUDA: {torch.cuda.is_available()}")
-if torch.cuda.is_available():
-    print(f"GPU: {torch.cuda.get_device_name(0)}")
-    print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
-
-# ========== Cell 2: 克隆仓库 + 安装依赖 ==========
+利用git下载heroesagent_training
+```
 !git clone https://github.com/likaitang666/heroesagent_training.git
-%cd heroesagent_training
-!pip install matplotlib -q
-
-# ========== Cell 3: 开始训练 ==========
-!python scripts/train.py \
-    --data_dir data \
-    --model efficientnet_b0 \
-    --epochs 50 \
-    --batch_size 64 \
-    --lr 3e-4 \
-    --warmup_epochs 3 \
-    --early_stop 10
 ```
 
-> **说明**: 代码自动使用 `__file__` 计算相对路径，无需修改任何路径配置。`--data_dir data` 指向仓库内的 `data/` 目录。
+### Step 2: Notebook 训练代码
 
-### 方式二: Kaggle Dataset 上传
-
-将仓库上传为 Kaggle Dataset 后使用:
+在 Kaggle Notebook 中依次运行:
 
 ```python
 # ========== Cell 1: 环境检查 ==========
@@ -93,42 +66,24 @@ print(f"PyTorch: {torch.__version__}")
 print(f"CUDA: {torch.cuda.is_available()}")
 if torch.cuda.is_available():
     print(f"GPU: {torch.cuda.get_device_name(0)}")
-    print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
+    print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+```
 
+```python
 # ========== Cell 2: 安装依赖 ==========
 !pip install matplotlib -q
+```
 
+```python
 # ========== Cell 3: 开始训练 ==========
-!python /kaggle/input/heroesagent_training/scripts/train.py \
-    --data_dir /kaggle/input/heroesagent_training/data \
+!python /kaggle/working/heroesagent_training/scripts/train.py \
+    --data_dir /kaggle/working/heroesagent_training/data \
     --model efficientnet_b0 \
     --epochs 50 \
     --batch_size 64 \
     --lr 3e-4 \
     --warmup_epochs 3 \
     --early_stop 10
-```
-
-也可以使用 Python 调用方式:
-
-```python
-import sys
-sys.path.insert(0, '/kaggle/input/heroesagent_training/scripts')
-from train import train
-import argparse
-
-args = argparse.Namespace(
-    model='efficientnet_b0',
-    data_dir='/kaggle/input/heroesagent_training/data',
-    epochs=50, batch_size=64, lr=3e-4,
-    weight_decay=1e-4, label_smoothing=0.1,
-    clip_grad=1.0, input_size=224,
-    device='auto', num_workers=2,
-    early_stop=10, warmup_epochs=3,
-    no_pretrain=False, no_amp=False,
-)
-history = train(args)
-print(f"Best val accuracy: {history['best_val_acc']:.2f}%")
 ```
 
 ### Step 3: 下载训练结果
