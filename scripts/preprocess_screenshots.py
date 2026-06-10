@@ -44,7 +44,7 @@ from pathlib import Path
 from typing import Optional
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-TRAINING_ROOT = PROJECT_ROOT / "training"
+TRAINING_ROOT = Path(__file__).parent.parent  # 训练模块根目录 (文件夹名无关)
 SCREENSHOTS_DIR = TRAINING_ROOT / "data" / "screenshots"
 RAW_DIR = SCREENSHOTS_DIR / "raw"
 ORGANIZED_DIR = SCREENSHOTS_DIR / "organized"

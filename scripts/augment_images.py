@@ -28,11 +28,11 @@ from pathlib import Path
 from PIL import Image, ImageEnhance, ImageFilter, ImageDraw
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-TRAINING_ROOT = PROJECT_ROOT / "training"
+TRAINING_ROOT = Path(__file__).parent.parent  # 训练模块根目录 (文件夹名无关)
 DEFAULT_INPUT = TRAINING_ROOT / "data" / "images"
 DEFAULT_OUTPUT = TRAINING_ROOT / "data" / "augmented"
 
-sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(TRAINING_ROOT / "scripts"))
 
 
 def add_random_occlusion(img: Image.Image) -> Image.Image:

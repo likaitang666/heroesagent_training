@@ -102,8 +102,8 @@ def get_default_transforms(train: bool = True, input_size: int = 224):
             T.RandomResizedCrop(input_size, scale=(0.7, 1.0), ratio=(0.9, 1.1)),
             T.RandomHorizontalFlip(p=0.5),
             T.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15, hue=0.03),
-            T.RandomErasing(p=0.2, scale=(0.02, 0.1), ratio=(0.3, 3.3), value=0),
             T.ToTensor(),
+            T.RandomErasing(p=0.2, scale=(0.02, 0.1), ratio=(0.3, 3.3), value=0),
             T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
     else:

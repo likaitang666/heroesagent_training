@@ -17,9 +17,10 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
+TRAINING_ROOT = Path(__file__).parent.parent  # 训练模块根目录 (文件夹名无关)
 IMAGES_DIRS = [
     PROJECT_ROOT / "images" / "creatures",
-    PROJECT_ROOT / "training" / "data" / "images",
+    TRAINING_ROOT / "data" / "images",
 ]
 REMAP_FILE = PROJECT_ROOT / "gamedata" / "label_remapping.json"
 
