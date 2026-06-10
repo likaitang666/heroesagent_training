@@ -48,13 +48,43 @@ python scripts/train.py --evaluate outputs/best_efficientnet_b0.pth --data_dir d
 | 推荐模型 | EfficientNet-B0 (5.3M 参数) |
 | 推荐 Batch Size | 64 (约 8GB 显存) |
 
-### Step 1: 上传数据到 Kaggle
+### 方式一: git clone（推荐）
 
-将 `training/` 文件夹上传为 Kaggle Dataset，或直接上传到 Notebook 的 input 目录。
+直接将仓库克隆到 `/kaggle/working/` 目录，无需上传 Dataset:
 
-### Step 2: Notebook 训练代码
+```python
+# ========== Cell 1: 环境准备 ==========
+import os
+import sys
+import torch
 
-在 Kaggle Notebook 中依次运行:
+print(f"PyTorch: {torch.__version__}")
+print(f"CUDA: {torch.cuda.is_available()}")
+if torch.cuda.is_available():
+    print(f"GPU: {torch.cuda.get_device_name(0)}")
+    print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
+
+# ========== Cell 2: 克隆仓库 + 安装依赖 ==========
+!git clone https://github.com/likaitang666/heroesagent_training.git
+%cd heroesagent_training
+!pip install matplotlib -q
+
+# ========== Cell 3: 开始训练 ==========
+!python scripts/train.py \
+    --data_dir data \
+    --model efficientnet_b0 \
+    --epochs 50 \
+    --batch_size 64 \
+    --lr 3e-4 \
+    --warmup_epochs 3 \
+    --early_stop 10
+```
+
+> **说明**: 代码自动使用 `__file__` 计算相对路径，无需修改任何路径配置。`--data_dir data` 指向仓库内的 `data/` 目录。
+
+### 方式二: Kaggle Dataset 上传
+
+将仓库上传为 Kaggle Dataset 后使用:
 
 ```python
 # ========== Cell 1: 环境检查 ==========
@@ -69,10 +99,8 @@ if torch.cuda.is_available():
 !pip install matplotlib -q
 
 # ========== Cell 3: 开始训练 ==========
-# 将 data_dir 改为你的数据集路径
-# Dataset 内路径格式: /kaggle/input/your-dataset/data/
-!python scripts/train.py \
-    --data_dir /kaggle/input/herosagent_training/data \
+!python /kaggle/input/heroesagent_training/scripts/train.py \
+    --data_dir /kaggle/input/heroesagent_training/data \
     --model efficientnet_b0 \
     --epochs 50 \
     --batch_size 64 \
@@ -85,13 +113,13 @@ if torch.cuda.is_available():
 
 ```python
 import sys
-sys.path.insert(0, '/kaggle/working/training')
-from training.scripts.train import train
+sys.path.insert(0, '/kaggle/input/heroesagent_training/scripts')
+from train import train
 import argparse
 
 args = argparse.Namespace(
     model='efficientnet_b0',
-    data_dir='/kaggle/input/herosagent-training/data',
+    data_dir='/kaggle/input/heroesagent_training/data',
     epochs=50, batch_size=64, lr=3e-4,
     weight_decay=1e-4, label_smoothing=0.1,
     clip_grad=1.0, input_size=224,
@@ -231,7 +259,7 @@ python scripts/augment_images.py --variations 3 --dry_run
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `--model` | efficientnet_b0 | torchvision 模型名 |
-| `--data_dir` | training/data | 数据目录（含 images/ 和 annotations/） |
+| `--data_dir` | data | 数据目录（含 images/ 和 annotations/），使用相对路径 |
 | `--epochs` | 50 | 训练轮数 |
 | `--batch_size` | 64 | 批次大小（GPU: 64, CPU: 4-16） |
 | `--lr` | 3e-4 | 初始学习率 |
@@ -308,7 +336,7 @@ training/
 │   ├── create_xlsx_mapping.py       # XLSX映射表
 │   ├── remap_labels.py              # 标签重映射
 │   └── download_bulwark_images.py   # Bulwark图片下载
-└── outputs/                         # 训练输出 (不上传git)
+└── outputs/                         # 训练输出（模型/图表/历史记录）
 ```
 
 ---
