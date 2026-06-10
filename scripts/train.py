@@ -363,7 +363,7 @@ def train(args: argparse.Namespace) -> dict:
     plot_training_curves(history, args.model)
 
     # 测试集评估 (如果存在)
-    test_csv = DATA_DIR / "annotations" / "test.csv"
+    test_csv = data_dir / "annotations" / "test.csv"
     if test_csv.exists():
         print(f"\n[评估] 在测试集上评估最佳模型...")
         evaluate_model(str(best_model_path), args.model, device, args.input_size, args.data_dir)

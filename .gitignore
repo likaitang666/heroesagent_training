@@ -1,14 +1,31 @@
 # 训练输出 (模型文件较大)
 outputs/
 
-# 大图片数据集 (用户自行准备)
-data/images/
-data/annotations/
+# 旧测试数据 (已废弃)
+data/test_run_0_9/
+
+# 数据增强输出 (可重新生成)
+data/augmented/
+
+# 大图片数据集映射表
 data/creature_image_mapping.xlsx
 data/_thumbnails/
 
-# 截图数据
+# 截图原始数据
 data/screenshots/
+
+# 旧版标注报告文件 (自动生成)
+data/annotations/missing.txt
+data/annotations/low_data.txt
+data/annotations/unmatched.txt
+data/annotations/creature_index.csv
+
+# 训练参考报告 (除README外的md文件)
+BATTLEFIELD_RECOGNITION.md
+MODEL_RECOMMENDATION.md
+QUANTIZATION_PLAN.md
+IMAGE_ADDITION_GUIDE.md
+BULWARK_IMAGE_SOURCES.md
 
 # Python
 __pycache__/

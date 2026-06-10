@@ -1,0 +1,31 @@
+{
+  "total_images": 649,
+  "num_classes": 10,
+  "classes": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "splits": {
+    "train": {
+      "count": 450,
+      "classes": 10
+    },
+    "val": {
+      "count": 97,
+      "classes": 10
+    },
+    "test": {
+      "count": 102,
+      "classes": 10
+    }
+  },
+  "images_dir": "F:\\桌面\\test3\\training\\data\\images"
+}

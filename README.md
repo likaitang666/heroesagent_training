@@ -1,384 +1,343 @@
 # H3HOTA Creature Classifier — 训练框架
 
-英雄无敌3:深渊号角（HotA）兵种图像识别模型训练框架。基于 PyTorch + torchvision，支持 CPU/GPU/混合精度训练。
+英雄无敌3:深渊号角（HotA）兵种图像识别模型训练框架。基于 PyTorch + torchvision，支持 CPU/GPU/混合精度训练，专为 Kaggle Notebook 环境优化。
 
 ## 目录
 
-- [当前测试数据](#当前测试数据)
-- [快速开始 (首次训练测试)](#快速开始-首次训练测试)
-- [Kaggle 训练指南](#kaggle-训练指南)
-- [本地 CPU 测试](#本地-cpu-测试)
-- [数据准备](#数据准备)
+- [快速开始](#快速开始)
+- [Kaggle Notebook 训练指南](#kaggle-notebook-训练指南)
+- [数据集说明](#数据集说明)
+- [数据增强](#数据增强)
 - [模型选型](#模型选型)
-- [训练输出说明](#训练输出说明)
-- [添加更多兵种](#添加更多兵种)
-- [常见问题](#常见问题)
+- [训练参数说明](#训练参数说明)
+- [常用命令](#常用命令)
+- [FAQ](#faq)
 
 ---
 
-## 当前测试数据
+## 快速开始
 
-**首次训练测试：仅 Castle 阵营前 10 种兵（label 0-9）**
-
-| Label | 兵种英文名 | 中文名 | 等级 | 图片数 |
-|-------|-----------|--------|------|--------|
-| 0 | Pikeman | 枪兵 | 1 | 20 |
-| 1 | Halberdier | 戟兵 | 1(upg) | 10 |
-| 2 | Archer | 弩箭手 | 2 | 10 |
-| 3 | Marksman | 重弩手 | 2(upg) | 10 |
-| 4 | Griffin | 狮鹫 | 3 | 10 |
-| 5 | Royal Griffin | 皇家狮鹫 | 3(upg) | 10 |
-| 6 | Swordsman | 剑士 | 4 | 10 |
-| 7 | Crusader | 十字军 | 4(upg) | 10 |
-| 8 | Monk | 僧侣 | 5 | 10 |
-| 9 | Zealot | 狂信徒 | 5(upg) | 10 |
-
-- **总图片数**: 110 张 (含数据增强变体)
-- **训练集**: 77 张 | **验证集**: 12 张 | **测试集**: 21 张
-- **数据目录**: `data/test_run_0_9/`
-
----
-
-## 快速开始 (首次训练测试)
-
-### 1. 安装依赖
+### 本地 CPU 快速验证（5 epoch）
 
 ```bash
-pip install torch torchvision pillow matplotlib scikit-learn
+python scripts/train.py --data_dir data --model efficientnet_b0 --epochs 5 --batch_size 4 --device cpu --no_amp
 ```
 
-### 2. 运行训练
+### GPU 完整训练
 
 ```bash
-# 使用 EfficientNet-B0 (推荐), 50 epochs
-python scripts/train.py --data_dir data/test_run_0_9 --model efficientnet_b0 --epochs 50 --batch_size 16
-
-# 使用 MobileNetV3-Large (更轻量)
-python scripts/train.py --data_dir data/test_run_0_9 --model mobilenet_v3_large --epochs 50 --batch_size 32
-
-# CPU 快速测试 (仅验证流程, 5 epochs)
-python scripts/train.py --data_dir data/test_run_0_9 --model efficientnet_b0 --epochs 5 --batch_size 8 --device cpu
+python scripts/train.py --data_dir data --model efficientnet_b0 --epochs 50 --batch_size 64
 ```
 
-### 3. 查看结果
+### 仅评估已有模型
 
-训练完成后在 `outputs/` 目录查看:
-- `training_curves_{model}.png` — loss/accuracy 曲线图
-- `history_{model}.json` — 训练历史数据
-- `best_{model}.pth` — 最佳模型权重
-- `confusion_matrix_{model}.png` — 混淆矩阵
-- `eval_{model}.json` — 测试集评估结果
+```bash
+python scripts/train.py --evaluate outputs/best_efficientnet_b0.pth --data_dir data
+```
 
 ---
 
-## Kaggle 训练指南
+## Kaggle Notebook 训练指南
 
 ### 环境说明
 
 | 项目 | 值 |
 |------|-----|
-| GPU | P100 (16GB 显存可用) |
+| GPU | P100 (16GB 显存) |
 | 框架 | PyTorch + torchvision |
 | 推荐模型 | EfficientNet-B0 (5.3M 参数) |
-| 推荐 Batch Size | 64 (P100 约4GB显存) |
+| 推荐 Batch Size | 64 (约 8GB 显存) |
 
 ### Step 1: 上传数据到 Kaggle
 
-1. 将整个 `training/` 文件夹打包为 ZIP
-2. 在 Kaggle Notebook 中上传为 Dataset 或直接上传文件
-3. 解压到 `/kaggle/working/`
+将 `training/` 文件夹上传为 Kaggle Dataset，或直接上传到 Notebook 的 input 目录。
 
-### Step 2: 安装依赖
+### Step 2: Notebook 训练代码
 
-在 Kaggle Notebook 的第一个 cell:
+在 Kaggle Notebook 中依次运行:
 
 ```python
-!pip install torch torchvision pillow matplotlib scikit-learn -q
+# ========== Cell 1: 环境检查 ==========
+import torch
+print(f"PyTorch: {torch.__version__}")
+print(f"CUDA: {torch.cuda.is_available()}")
+if torch.cuda.is_available():
+    print(f"GPU: {torch.cuda.get_device_name(0)}")
+    print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
+
+# ========== Cell 2: 安装依赖 ==========
+!pip install matplotlib -q
+
+# ========== Cell 3: 开始训练 ==========
+# 将 data_dir 改为你的数据集路径
+# Dataset 内路径格式: /kaggle/input/your-dataset/data/
+!python scripts/train.py \
+    --data_dir /kaggle/input/herosagent-training/data \
+    --model efficientnet_b0 \
+    --epochs 50 \
+    --batch_size 64 \
+    --lr 3e-4 \
+    --warmup_epochs 3 \
+    --early_stop 10
 ```
 
-### Step 3: 运行训练
+也可以使用 Python 调用方式:
 
 ```python
 import sys
 sys.path.insert(0, '/kaggle/working/training')
-
-# 方式一: 命令行方式
-!python /kaggle/working/training/scripts/train.py \
-    --data_dir /kaggle/working/training/data/test_run_0_9 \
-    --model efficientnet_b0 \
-    --epochs 50 \
-    --batch_size 64 \
-    --lr 3e-4
-
-# 方式二: Python 调用
 from training.scripts.train import train
 import argparse
 
 args = argparse.Namespace(
     model='efficientnet_b0',
-    data_dir='/kaggle/working/training/data/test_run_0_9',
-    epochs=50,
-    batch_size=64,
-    lr=3e-4,
-    weight_decay=1e-4,
-    label_smoothing=0.1,
-    clip_grad=1.0,
-    input_size=224,
-    device='auto',
-    num_workers=2,
-    early_stop=10,
-    warmup_epochs=3,
-    no_pretrain=False,
-    no_amp=False,
+    data_dir='/kaggle/input/herosagent-training/data',
+    epochs=50, batch_size=64, lr=3e-4,
+    weight_decay=1e-4, label_smoothing=0.1,
+    clip_grad=1.0, input_size=224,
+    device='auto', num_workers=2,
+    early_stop=10, warmup_epochs=3,
+    no_pretrain=False, no_amp=False,
 )
 history = train(args)
 print(f"Best val accuracy: {history['best_val_acc']:.2f}%")
 ```
 
-### Step 4: 下载模型
+### Step 3: 下载训练结果
 
+训练完成后，模型和图表保存在 `outputs/`:
+
+| 文件 | 说明 |
+|------|------|
+| `outputs/best_{model}.pth` | 最佳模型 checkpoint |
+| `outputs/training_curves_{model}.png` | Loss/Accuracy 曲线图 |
+| `outputs/confusion_matrix_{model}.png` | 混淆矩阵 |
+| `outputs/history_{model}.json` | 训练历史数据 |
+| `outputs/eval_{model}.json` | 测试集评估结果 |
+
+打包下载:
 ```python
-# 查看生成的输出文件
-import os
-for f in sorted(os.listdir('/kaggle/working/training/outputs/')):
-    print(f)
-
-# Kaggle 会自动保存 outputs/ 目录下的文件
-# 训练完成后可在 Notebook 右侧 "Output" 标签页下载
+import shutil
+shutil.make_archive("model_output", "zip", "outputs")
 ```
 
-### Kaggle 显存建议
+### Kaggle P100 显存参考
 
 | 模型 | 推荐 Batch | 预计显存 |
 |------|-----------|---------|
-| EfficientNet-B0 | 64-128 | 4-7 GB |
-| MobileNetV3-Large | 64-128 | 3-6 GB |
-| MobileNetV3-Small | 128-256 | 2-4 GB |
-| ResNet-18 | 32-64 | 5-9 GB |
-
-P100 有 16GB 显存，以上配置均足够。
-
----
-
-## 本地 CPU 测试
-
-用于验证代码流程是否正常（不需要 GPU）:
-
-```bash
-# 仅 5 epochs, 小 batch, 快速验证
-python scripts/train.py \
-    --data_dir data/test_run_0_9 \
-    --model efficientnet_b0 \
-    --epochs 5 \
-    --batch_size 4 \
-    --device cpu \
-    --no_amp
-
-# 预期: 5 分钟内完成, 确认无报错即可
-```
+| efficientnet_b0 | 64 | ~8GB |
+| efficientnet_b1 | 48 | ~12GB |
+| mobilenet_v3_large | 96 | ~6GB |
+| resnet18 | 64 | ~6GB |
+| resnet34 | 48 | ~10GB |
+| resnet50 | 32 | ~14GB |
+| shufflenet_v2_x1_0 | 128 | ~4GB |
 
 ---
 
-## 数据准备
+## 数据集说明
 
-### 当前训练数据
+### 当前数据 (10类兵种，649张图片)
 
-首次测试使用 `data/test_run_0_9/`:
+图片按兵种分文件夹组织: `data/images/{兵种编号}/{兵种编号}_{序号}.png`
+
+| 兵种编号 | 图片数 | 训练 | 验证 | 测试 |
+|---------|--------|------|------|------|
+| 0 | 79 | 55 | 11 | 13 |
+| 1 | 64 | 44 | 10 | 10 |
+| 2 | 65 | 45 | 10 | 10 |
+| 3 | 63 | 44 | 9 | 10 |
+| 4 | 63 | 44 | 9 | 10 |
+| 5 | 63 | 44 | 9 | 10 |
+| 6 | 62 | 43 | 9 | 10 |
+| 7 | 64 | 44 | 10 | 10 |
+| 8 | 62 | 43 | 10 | 9 |
+| 9 | 64 | 44 | 10 | 10 |
+| **总计** | **649** | **450** | **97** | **102** |
+
+- 分割比例: 70/15/15（分层分割，每类独立采样）
+- 图片格式: PNG，统一命名 `{兵种编号}_{序号}.png`
+
+### 添加新数据
+
+将新图片按兵种编号放入对应子文件夹:
+
 ```
-data/test_run_0_9/
-├── images/              # 110 张图片 (10类 × 10-20张)
-│   ├── 0_0.png          # Pikeman 原始图
-│   ├── 0_0_aug01.png    # Pikeman 增强变体
-│   └── ...
-└── annotations/         # 标注文件
-    ├── train.csv        # 训练集
-    ├── val.csv          # 验证集
-    ├── test.csv         # 测试集
-    ├── full.csv         # 完整标注
-    └── summary.json     # 数据集摘要
+data/images/
+├── 0/   ← 兵种0的图片 (已存在79张)
+├── 1/
+├── ...
+└── 10/  ← 新增兵种10的图片放这里
 ```
 
-### 图片命名规范
-
-`{label_index}_{序号}.png`
-
-- `label_index`: 兵种标签索引 (0=Pikeman, 1=Halberdier, ...)
-- `序号`: 该兵种的第几张图片 (0, 1, 2, ...)
-- 增强变体自动添加 `_aug01`, `_aug02` 等后缀
-
-### 添加更多图片
+然后重新生成标注:
 
 ```bash
-# 1. 将新图片放入对应目录 (按命名规范)
-# 2. 运行数据增强扩充数据集
-python scripts/augment_images.py \
-    --input data/test_run_0_9/images \
-    --output data/test_run_0_9/images \
-    --variations 9
-
-# 3. 重新生成标注
-# (手动运行 generate_annotations.py 或重新准备数据)
+python scripts/generate_annotations.py
 ```
 
-### 从截图准备新兵种
+---
 
-参见 `截图要求.txt` (项目根目录) 了解截图规范。
+## 数据增强
 
-截图预处理脚本:
+### 离线增强（训练前扩充训练集）
+
 ```bash
-python scripts/preprocess_screenshots.py --help
+# 为每张图生成9个增强变体，输出到 data/augmented/
+python scripts/augment_images.py --input data/images --output data/augmented --variations 9
+
+# 预览模式（不实际保存）
+python scripts/augment_images.py --variations 3 --dry_run
 ```
+
+增强策略:
+- 水平翻转 (50%) — **不做垂直翻转**（兵种不会倒立）
+- 随机旋转 (±20度)
+- 随机裁剪 + 拉伸回原尺寸 (40%)
+- 随机遮挡块 (30%，模拟战斗中部分遮挡)
+- 亮度/对比度/饱和度调整
+- 拉伸变形 (25%)
+- 轻微锐化 (20%)
+
+### 在线增强（训练时自动应用）
+
+`dataset.py` 中 `get_default_transforms` 在训练时自动应用:
+- `RandomResizedCrop` (scale 0.7-1.0)
+- `RandomHorizontalFlip` (50%，不包含垂直翻转)
+- `ColorJitter` (亮度/对比度/饱和度)
+- `RandomErasing` (随机遮挡, 20%)
 
 ---
 
 ## 模型选型
 
-详见 [MODEL_RECOMMENDATION.md](MODEL_RECOMMENDATION.md)，7 个候选模型的完整对比。
+所有模型基于 torchvision，使用 ImageNet 预训练权重。
 
-| 模型 | 参数量 | ImageNet Top-1 | CPU推理 | 推荐场景 |
-|------|--------|---------------|---------|---------|
-| **EfficientNet-B0** | 5.3M | 77.1% | ~22ms | **首选**: 精度/效率最佳平衡 |
-| MobileNetV3-Large | 5.5M | 75.2% | ~18ms | CPU推理优先 |
-| MobileNetV3-Small | 2.5M | 67.4% | ~10ms | 极致轻量 |
-| ResNet-18 | 11.7M | 69.8% | ~28ms | 训练最稳定 |
-| ShuffleNetV2 x1.0 | 2.3M | 69.4% | ~8ms | ARM/移动端 |
-| MobileViT-XXS | 1.3M | 69.0% | ~15ms | CNN+Transformer混合 |
-| DeiT-Tiny | 5.7M | 72.2% | ~35ms | 纯Transformer |
+| 模型 | 参数量 | Top-1 | 推理(CPU) | 推荐场景 |
+|------|--------|-------|----------|---------|
+| **efficientnet_b0** | 5.3M | 77.1% | ~22ms | **首选**: 精度/效率最佳平衡 |
+| mobilenet_v3_large | 5.5M | 75.2% | ~18ms | CPU推理优先 |
+| mobilenet_v3_small | 2.5M | 67.4% | ~10ms | 极致轻量 |
+| resnet18 | 11.7M | 69.8% | ~28ms | 训练最稳定 |
+| resnet34 | 21.8M | 73.3% | ~45ms | 精度略高 |
+| shufflenet_v2_x1_0 | 2.3M | 69.4% | ~8ms | ARM/移动端 |
 
-### 首次测试推荐
-
-对于 10 类兵种首次测试，推荐:
-
-1. **EfficientNet-B0** — 5.3M 参数，预期 85%+ 准确率
-2. **MobileNetV3-Large** — 如果 CPU 推理速度优先
+> 首选 `efficientnet_b0`，P100 上约 15-20 分钟完成 50 epoch。
 
 ---
 
-## 训练输出说明
-
-训练完成后 `outputs/` 目录包含:
-
-| 文件 | 说明 |
-|------|------|
-| `best_{model}.pth` | 最佳模型 checkpoint (含权重+优化器状态+训练历史) |
-| `history_{model}.json` | 训练历史 (每 epoch 的 loss/acc/lr) |
-| `training_curves_{model}.png` | loss-epoch + accuracy-epoch 双图 |
-| `confusion_matrix_{model}.png` | 测试集混淆矩阵 |
-| `eval_{model}.json` | 测试集评估指标 |
-
-### 训练参数说明
+## 训练参数说明
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `--model` | efficientnet_b0 | torchvision 模型名 |
+| `--data_dir` | training/data | 数据目录（含 images/ 和 annotations/） |
 | `--epochs` | 50 | 训练轮数 |
-| `--batch_size` | 64 | 批次大小 (GPU 64, CPU 8) |
-| `--lr` | 3e-4 | 学习率 |
-| `--weight_decay` | 1e-4 | 权重衰减 |
+| `--batch_size` | 64 | 批次大小（GPU: 64, CPU: 4-16） |
+| `--lr` | 3e-4 | 初始学习率 |
+| `--weight_decay` | 1e-4 | 权重衰减 (L2正则) |
 | `--label_smoothing` | 0.1 | 标签平滑 |
-| `--clip_grad` | 1.0 | 梯度裁剪 |
-| `--input_size` | 224 | 输入图片尺寸 |
+| `--clip_grad` | 1.0 | 梯度裁剪阈值 |
+| `--input_size` | 224 | 模型输入尺寸 |
 | `--device` | auto | auto/cpu/cuda |
-| `--data_dir` | data | 数据目录路径 |
-| `--early_stop` | 10 | Early stopping patience (0=关闭) |
+| `--num_workers` | 2 | DataLoader 工作进程数 |
+| `--early_stop` | 10 | Early Stopping 耐心值 (0=关闭) |
 | `--warmup_epochs` | 3 | 学习率 warmup 轮数 |
-| `--no_pretrain` | False | 不使用 ImageNet 预训练权重 |
+| `--no_pretrain` | False | 不使用预训练权重 |
 | `--no_amp` | False | 禁用混合精度训练 |
 
 ---
 
-## 添加更多兵种
-
-当需要扩展训练到更多兵种时:
-
-### 1. 添加图片
-
-将新兵种图片放入 `data/test_run_0_9/images/` (或新数据目录)，命名遵循 `{label_index}_{序号}.png`。
-
-### 2. 重新生成标注
-
-使用 Python 脚本重新生成标注文件:
-
-```python
-import json, csv, random
-from pathlib import Path
-from collections import defaultdict
-
-# 配置
-IMG_DIR = Path('data/test_run_0_9/images')
-ANN_DIR = Path('data/test_run_0_9/annotations')
-LABEL_FILE = Path('gamedata/creature_labels.json')
-TARGET_LABELS = range(10)  # 修改为需要的 label 范围
-
-# ... 运行标注生成逻辑
-```
-
-### 3. 数据增强
+## 常用命令
 
 ```bash
-python scripts/augment_images.py --input data/test_run_0_9/images --variations 9
-```
+# 首次训练 (10类，推荐)
+python scripts/train.py --data_dir data --model efficientnet_b0 --epochs 50 --batch_size 64
 
-### 4. 重新训练
+# CPU 快速验证 (5 epoch)
+python scripts/train.py --data_dir data --model efficientnet_b0 --epochs 5 --batch_size 4 --device cpu --no_amp
 
-```bash
-python scripts/train.py --data_dir data/test_run_0_9 --model efficientnet_b0 --epochs 50
-```
+# 轻量模型
+python scripts/train.py --data_dir data --model mobilenet_v3_large --epochs 50 --batch_size 96
 
----
+# 生成标注文件
+python scripts/generate_annotations.py
 
-## 常见问题
+# 数据增强 (每张图9个变体)
+python scripts/augment_images.py --input data/images --output data/augmented --variations 9
 
-### Q: ImportError: No module named 'torch'
-安装 PyTorch: `pip install torch torchvision`
+# 重命名未规范的截图 (QQ截图等)
+python scripts/rename_unrenamed.py --dry-run   # 预览
+python scripts/rename_unrenamed.py             # 执行
 
-### Q: CUDA out of memory
-减小 batch_size: `--batch_size 16` 或 `--batch_size 8`
+# 评估模型
+python scripts/train.py --evaluate outputs/best_efficientnet_b0.pth --data_dir data
 
-### Q: 训练集太小，精度很低
-每个兵种建议至少 10 张图片。使用数据增强扩充:
-```bash
-python scripts/augment_images.py --variations 19
-```
-
-### Q: 如何从已有模型继续训练？
-在 train.py 中加载 checkpoint:
-```python
-checkpoint = torch.load('outputs/best_efficientnet_b0.pth')
-model.load_state_dict(checkpoint['model_state_dict'])
-# 然后正常调用 train()
-```
-
-### Q: 如何导出 ONNX 用于推理部署？
-```bash
+# 导出 ONNX 模型
 python scripts/train.py --export_onnx outputs/best_efficientnet_b0.pth
 ```
 
 ---
 
-## 目录结构
+## 项目结构
 
 ```
 training/
-├── README.md                          # 本文件
-├── BATTLEFIELD_RECOGNITION.md         # 战场三模型流水线方案
-├── MODEL_RECOMMENDATION.md            # 7模型选型报告
-├── QUANTIZATION_PLAN.md               # 量化方案预备
-├── IMAGE_ADDITION_GUIDE.md            # 图片添加指南
-├── BULWARK_IMAGE_SOURCES.md           # Bulwark 图片来源
+├── README.md                        # 本文件
+├── .gitignore                       # Git 忽略规则
 ├── data/
-│   └── test_run_0_9/                  # 首次测试数据 (10类)
-│       ├── images/                    # 110张训练图片
-│       └── annotations/              # 标注CSV文件
+│   ├── images/                      # 训练图片（按兵种分文件夹）
+│   │   ├── 0/  (79张)
+│   │   ├── 1/  (64张)
+│   │   ├── ...
+│   │   └── 9/  (64张)
+│   └── annotations/                 # 标注文件
+│       ├── train.csv                # 训练集 (450张)
+│       ├── val.csv                  # 验证集 (97张)
+│       ├── test.csv                 # 测试集 (102张)
+│       ├── full.csv                 # 全部标注 (649张)
+│       └── summary.json             # 数据集摘要
 ├── scripts/
-│   ├── dataset.py                     # PyTorch Dataset (CPU/GPU兼容)
-│   ├── train.py                       # 训练主脚本 (AMP/Warmup/图表/ONNX)
-│   ├── augment_images.py              # 数据增强
-│   ├── generate_annotations.py        # 全量标注生成 (189类)
-│   ├── preprocess_screenshots.py      # 截图预处理 (~22k张管理)
-│   ├── create_xlsx_mapping.py         # XLSX映射表
-│   ├── rename_images.py               # 批量重命名
-│   ├── remap_labels.py                # 标签重映射
-│   └── download_bulwark_images.py     # Bulwark图片下载
-└── outputs/                           # 训练输出 (模型/图表/评估)
+│   ├── dataset.py                   # PyTorch Dataset (CPU/GPU)
+│   ├── train.py                     # 训练主脚本
+│   ├── augment_images.py            # 离线数据增强
+│   ├── generate_annotations.py      # 标注生成
+│   ├── rename_unrenamed.py          # 图片批量重命名
+│   ├── rename_images.py             # 旧版重命名（按标签匹配）
+│   ├── preprocess_screenshots.py    # 截图预处理
+│   ├── create_xlsx_mapping.py       # XLSX映射表
+│   ├── remap_labels.py              # 标签重映射
+│   └── download_bulwark_images.py   # Bulwark图片下载
+└── outputs/                         # 训练输出 (不上传git)
 ```
+
+---
+
+## FAQ
+
+### Q1: CUDA out of memory
+减小 `--batch_size`，例如从 64 降到 32 或 16。P100 (16GB) 上 efficientnet_b0 可安全使用 batch_size=64。
+
+### Q2: 数据不够，每类只有几十张图？
+- 使用离线增强: `python scripts/augment_images.py --variations 9`
+- 训练时 `--label_smoothing 0.1` 减少过拟合
+- 使用较小模型 (efficientnet_b0 或 mobilenet_v3_large)
+
+### Q3: 如何继续中断的训练？
+目前版本暂不支持断点续训。建议在 Kaggle 上开启 "Save Output" 保存最佳模型。
+
+### Q4: CPU 推理如何优化？
+1. 训练时选轻量模型: `--model mobilenet_v3_large`
+2. 导出 ONNX 后用 ONNX Runtime 推理
+3. 导出: `python scripts/train.py --export_onnx outputs/best_model.pth`
+
+### Q5: 新增兵种类别后如何操作？
+1. 将新兵种图片按编号放入 `data/images/{新编号}/`
+2. 运行: `python scripts/generate_annotations.py`
+3. 训练时模型自动适配新的类别数
+
+### Q6: 验证集准确率不提升？
+- 检查图片是否按兵种正确分文件夹
+- 尝试减小学习率: `--lr 1e-4`
+- 增加 warmup: `--warmup_epochs 5`
+- 使用离线数据增强扩充训练集

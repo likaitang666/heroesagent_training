@@ -1,7 +1,8 @@
 """PyTorch Dataset — 加载兵种图片及标签。
 
-支持从CSV标注文件读取,兼容train/val/test split。
-图片自动resize到模型输入尺寸,支持数据增强。
+支持从CSV标注文件读取, 兼容train/val/test split。
+图片自动resize到模型输入尺寸, 支持数据增强。
+图片路径为相对于images_dir的相对路径 (如 "0/0_0.png")。
 """
 
 import csv
@@ -18,12 +19,13 @@ class CreatureDataset(Dataset):
 
     Args:
         csv_path: 标注CSV文件路径 (含 image, label_index 列)
-        images_dir: 图片所在目录
+        images_dir: 图片所在根目录 (内含 0/, 1/, ... 子文件夹)
         transform: torchvision transforms (训练时含增强,验证/测试时仅标准化)
         target_size: 模型输入尺寸, 默认224
 
     CSV格式:
         image,label_index,name_en,name_zh,faction,level,is_upgraded
+        image 列存储相对路径如 "0/0_0.png"
     """
 
     def __init__(
@@ -84,6 +86,11 @@ class CreatureDataset(Dataset):
 def get_default_transforms(train: bool = True, input_size: int = 224):
     """获取默认数据增强pipeline。
 
+    训练增强: 随机裁剪+缩放, 水平翻转, 颜色抖动, 随机擦除(遮挡)
+    验证: 仅resize+标准化
+
+    注意: 不做垂直翻转 (兵种不会倒立)
+
     Args:
         train: True返回训练增强, False返回验证标准化
         input_size: 输入尺寸
@@ -92,9 +99,10 @@ def get_default_transforms(train: bool = True, input_size: int = 224):
 
     if train:
         return T.Compose([
-            T.RandomResizedCrop(input_size, scale=(0.8, 1.0)),
+            T.RandomResizedCrop(input_size, scale=(0.7, 1.0), ratio=(0.9, 1.1)),
             T.RandomHorizontalFlip(p=0.5),
-            T.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05),
+            T.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15, hue=0.03),
+            T.RandomErasing(p=0.2, scale=(0.02, 0.1), ratio=(0.3, 3.3), value=0),
             T.ToTensor(),
             T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
