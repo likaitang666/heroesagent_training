@@ -223,10 +223,12 @@ def train(args: argparse.Namespace) -> dict:
     else:
         val_dataset = None
 
-    num_classes = train_dataset.num_classes
+    num_classes = CreatureDataset.get_total_classes(
+        str(data_dir / "annotations" / "creature_index.xlsx")
+    )
     print(f"[训练] 训练集: {len(train_dataset)} 张, "
           f"验证集: {len(val_dataset) if val_dataset else 0} 张")
-    print(f"[训练] 类别数: {num_classes}")
+    print(f"[训练] 类别数: {num_classes} (来自creature_index.xlsx)")
 
     if len(train_dataset) < 50:
         print(f"[训练] [WARN] 训练集很小 ({len(train_dataset)}张), "
@@ -335,6 +337,8 @@ def train(args: argparse.Namespace) -> dict:
             patience_counter = 0
             torch.save({
                 "epoch": epoch,
+                "model_name": args.model,
+                "num_classes": num_classes,
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
                 "val_acc": val_acc if val_loader else train_acc,
@@ -454,7 +458,9 @@ def evaluate_model(
     )
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
-    num_classes = test_dataset.num_classes
+    num_classes = CreatureDataset.get_total_classes(
+        str(ddir / "annotations" / "creature_index.xlsx")
+    )
     model = build_model(model_name, num_classes, pretrained=False)
     checkpoint = torch.load(model_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint["model_state_dict"])

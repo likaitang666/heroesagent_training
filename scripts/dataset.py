@@ -82,6 +82,23 @@ class CreatureDataset(Dataset):
     def num_classes(self) -> int:
         return len(set(s["label_index"] for s in self.samples))
 
+    @staticmethod
+    def get_total_classes(xlsx_path: Optional[str] = None) -> int:
+        """从creature_index.xlsx获取总类别数 (默认191)。"""
+        if xlsx_path is None:
+            xlsx_path = str(
+                Path(__file__).parent.parent / "data" / "annotations" / "creature_index.xlsx"
+            )
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(xlsx_path, read_only=True)
+            ws = wb.active
+            count = sum(1 for _ in ws.iter_rows(min_row=2, values_only=True))
+            wb.close()
+            return max(count, 1)
+        except Exception:
+            return len(set(s["label_index"] for s in self.samples))
+
 
 def get_default_transforms(train: bool = True, input_size: int = 224):
     """获取默认数据增强pipeline。
@@ -102,8 +119,8 @@ def get_default_transforms(train: bool = True, input_size: int = 224):
             T.RandomResizedCrop(input_size, scale=(0.7, 1.0), ratio=(0.9, 1.1)),
             T.RandomHorizontalFlip(p=0.5),
             T.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15, hue=0.03),
-            T.RandomErasing(p=0.2, scale=(0.02, 0.1), ratio=(0.3, 3.3), value=0),
             T.ToTensor(),
+            T.RandomErasing(p=0.2, scale=(0.02, 0.1), ratio=(0.3, 3.3), value=0),
             T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
     else:
