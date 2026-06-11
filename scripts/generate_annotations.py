@@ -88,9 +88,11 @@ def generate_annotations() -> None:
 
     ANNOTATIONS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # 获取所有数字命名子文件夹
+    # 获取所有数字命名子文件夹 (仅兵种类别0-188, 排除障碍物/空地等)
+    MAX_CREATURE_ID = 188
     subdirs = sorted(
-        [d for d in IMAGES_DIR.iterdir() if d.is_dir() and d.name.isdigit()],
+        [d for d in IMAGES_DIR.iterdir()
+         if d.is_dir() and d.name.isdigit() and int(d.name) <= MAX_CREATURE_ID],
         key=lambda d: int(d.name),
     )
 

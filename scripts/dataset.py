@@ -22,6 +22,7 @@ class CreatureDataset(Dataset):
         images_dir: 图片所在根目录 (内含 0/, 1/, ... 子文件夹)
         transform: torchvision transforms (训练时含增强,验证/测试时仅标准化)
         target_size: 模型输入尺寸, 默认224
+        num_classes: 模型总类别数 (可大于数据集中实际出现的类别数)
 
     CSV格式:
         image,label_index,name_en,name_zh,faction,level,is_upgraded
@@ -34,6 +35,7 @@ class CreatureDataset(Dataset):
         images_dir: str,
         transform: Optional[Callable] = None,
         target_size: int = 224,
+        num_classes: Optional[int] = None,
     ):
         self.images_dir = Path(images_dir)
         self.transform = transform
@@ -53,6 +55,12 @@ class CreatureDataset(Dataset):
 
         if not self.samples:
             raise ValueError(f"CSV文件无有效数据: {csv_path}")
+
+        data_classes = len(set(s["label_index"] for s in self.samples))
+        if num_classes is not None:
+            self._num_classes = num_classes
+        else:
+            self._num_classes = data_classes
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -80,7 +88,7 @@ class CreatureDataset(Dataset):
 
     @property
     def num_classes(self) -> int:
-        return len(set(s["label_index"] for s in self.samples))
+        return self._num_classes
 
 
 def get_default_transforms(train: bool = True, input_size: int = 224):
@@ -102,8 +110,8 @@ def get_default_transforms(train: bool = True, input_size: int = 224):
             T.RandomResizedCrop(input_size, scale=(0.7, 1.0), ratio=(0.9, 1.1)),
             T.RandomHorizontalFlip(p=0.5),
             T.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15, hue=0.03),
-            T.RandomErasing(p=0.2, scale=(0.02, 0.1), ratio=(0.3, 3.3), value=0),
             T.ToTensor(),
+            T.RandomErasing(p=0.2, scale=(0.02, 0.1), ratio=(0.3, 3.3), value=0),
             T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
     else:
