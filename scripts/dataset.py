@@ -22,12 +22,14 @@ class CreatureDataset(Dataset):
         images_dir: 图片所在根目录 (内含 0/, 1/, ... 子文件夹)
         transform: torchvision transforms (训练时含增强,验证/测试时仅标准化)
         target_size: 模型输入尺寸, 默认224
-        num_classes: 模型总类别数 (可大于数据集中实际出现的类别数)
 
     CSV格式:
         image,label_index,name_en,name_zh,faction,level,is_upgraded
         image 列存储相对路径如 "0/0_0.png"
     """
+
+    # 总类别数 (189兵种 + 障碍物 + 空地)
+    TOTAL_CLASSES = 191
 
     def __init__(
         self,
@@ -35,11 +37,12 @@ class CreatureDataset(Dataset):
         images_dir: str,
         transform: Optional[Callable] = None,
         target_size: int = 224,
-        num_classes: Optional[int] = None,
+        num_classes: int = 191,
     ):
         self.images_dir = Path(images_dir)
         self.transform = transform
         self.target_size = target_size
+        self._num_classes = num_classes
 
         self.samples: list[dict] = []
         with open(csv_path, encoding="utf-8") as f:
@@ -55,12 +58,6 @@ class CreatureDataset(Dataset):
 
         if not self.samples:
             raise ValueError(f"CSV文件无有效数据: {csv_path}")
-
-        data_classes = len(set(s["label_index"] for s in self.samples))
-        if num_classes is not None:
-            self._num_classes = num_classes
-        else:
-            self._num_classes = data_classes
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -88,6 +85,7 @@ class CreatureDataset(Dataset):
 
     @property
     def num_classes(self) -> int:
+        """总类别数 (191 = 189兵种 + 障碍物 + 空地)。"""
         return self._num_classes
 
 

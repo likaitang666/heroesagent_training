@@ -26,13 +26,14 @@
 """
 
 import argparse
-import csv
 import json
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+sys.stdout.reconfigure(encoding='utf-8')
 
 import torch
 import torch.nn as nn
@@ -47,42 +48,6 @@ OUTPUTS_DIR = TRAINING_ROOT / "outputs"
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from training.scripts.dataset import CreatureDataset, get_default_transforms
-
-# 模型总类别数: 189类兵种 + 障碍物 + 空地 = 191
-TOTAL_CREATURE_CLASSES = 189
-EXTRA_CLASSES = 2  # 障碍物, 空地
-TOTAL_NUM_CLASSES = TOTAL_CREATURE_CLASSES + EXTRA_CLASSES  # 191
-
-
-def load_class_names(creature_csv: Optional[str] = None) -> list[str]:
-    """从creature_index.csv加载类别名称, 追加障碍物和空地。
-
-    Args:
-        creature_csv: creature_index.csv路径, 默认从training/data/annotations读取
-
-    Returns:
-        长度为191的类别名称列表 (0-188: 兵种, 189: 障碍物, 190: 空地)
-    """
-    if creature_csv is None:
-        creature_csv = str(TRAINING_ROOT / "data" / "annotations" / "creature_index.csv")
-
-    names: list[str] = []
-    with open(creature_csv, encoding="utf-8") as f:
-        reader = csv.reader(f)
-        next(reader)  # 跳过表头
-        for row in reader:
-            if len(row) >= 2:
-                names.append(row[1])  # 中文名
-
-    # 验证兵种类别数
-    if len(names) != TOTAL_CREATURE_CLASSES:
-        print(f"[WARN] creature_index.csv有{len(names)}个兵种, 期望{TOTAL_CREATURE_CLASSES}")
-
-    # 追加障碍物和空地
-    names.append("障碍物")
-    names.append("空地")
-
-    return names
 
 
 # ============================================================
@@ -244,16 +209,11 @@ def train(args: argparse.Namespace) -> dict:
             f"请先运行: python training/scripts/generate_annotations.py"
         )
 
-    # 加载全量类别名称 (191类)
-    class_names = load_class_names()
-    num_classes = TOTAL_NUM_CLASSES
-    print(f"[训练] 模型输出类别数: {num_classes} (数据集实际类别数可能较少)")
-
     train_dataset = CreatureDataset(
         str(train_csv), str(images_dir),
         transform=get_default_transforms(train=True, input_size=args.input_size),
         target_size=args.input_size,
-        num_classes=num_classes,
+        num_classes=191,
     )
 
     val_exists = val_csv.exists()
@@ -262,15 +222,15 @@ def train(args: argparse.Namespace) -> dict:
             str(val_csv), str(images_dir),
             transform=get_default_transforms(train=False, input_size=args.input_size),
             target_size=args.input_size,
-            num_classes=num_classes,
+            num_classes=191,
         )
     else:
         val_dataset = None
 
-    data_num_classes = len(set(s["label_index"] for s in train_dataset.samples))
+    num_classes = train_dataset.num_classes
     print(f"[训练] 训练集: {len(train_dataset)} 张, "
           f"验证集: {len(val_dataset) if val_dataset else 0} 张")
-    print(f"[训练] 数据实际类别数: {data_num_classes} / 模型输出类别数: {num_classes}")
+    print(f"[训练] 类别数: {num_classes}")
 
     if len(train_dataset) < 50:
         print(f"[训练] [WARN] 训练集很小 ({len(train_dataset)}张), "
@@ -383,9 +343,6 @@ def train(args: argparse.Namespace) -> dict:
                 "optimizer_state_dict": optimizer.state_dict(),
                 "val_acc": val_acc if val_loader else train_acc,
                 "history": history,
-                "class_names": class_names,
-                "num_classes": num_classes,
-                "model_name": args.model,
             }, best_model_path)
             print(f"  -> 保存最佳模型 (Score: {current_score:.2f}%)")
         else:
@@ -498,12 +455,13 @@ def evaluate_model(
         str(test_csv), str(images_dir),
         transform=get_default_transforms(train=False, input_size=input_size),
         target_size=input_size,
+        num_classes=191,
     )
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
-    checkpoint = torch.load(model_path, map_location=device, weights_only=False)
-    num_classes = checkpoint.get("num_classes", test_dataset.num_classes)
+    num_classes = test_dataset.num_classes
     model = build_model(model_name, num_classes, pretrained=False)
+    checkpoint = torch.load(model_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device)
     model.eval()
@@ -602,7 +560,7 @@ def export_onnx(model_path: str, model_name: str,
         output_path = str(OUTPUTS_DIR / f"{model_name}.onnx")
 
     checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
-    num_classes = checkpoint.get("num_classes", TOTAL_NUM_CLASSES)
+    num_classes = checkpoint.get("history", {}).get("num_classes", 191)
     model = build_model(model_name, num_classes, pretrained=False)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()

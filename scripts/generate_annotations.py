@@ -26,6 +26,8 @@ from pathlib import Path
 from collections import defaultdict
 from typing import Optional
 
+sys.stdout.reconfigure(encoding='utf-8')
+
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 TRAINING_ROOT = PROJECT_ROOT / "training"
 IMAGES_DIR = TRAINING_ROOT / "data" / "images"
