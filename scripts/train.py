@@ -77,7 +77,7 @@ def train(args: argparse.Namespace) -> dict:
     use_amp = False
     if device.type == "cuda":
         print(f"[训练] GPU: {torch.cuda.get_device_name(0)}")
-        mem_gb = torch.cuda.get_device_properties(0).total_mem / 1e9
+        mem_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
         print(f"[训练] 显存: {mem_gb:.1f}GB")
         use_amp = not args.no_amp
 
