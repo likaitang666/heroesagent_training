@@ -1,7 +1,7 @@
 """训练循环 — 单epoch训练/验证逻辑。
 
 用法:
-    from training.scripts.train_loop import train_epoch, validate_epoch
+    from train_loop import train_epoch, validate_epoch
     loss, acc = train_epoch(model, loader, criterion, optimizer, device)
     val_loss, val_acc, preds, labels = validate_epoch(model, loader, criterion, device)
 """

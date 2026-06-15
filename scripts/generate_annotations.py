@@ -5,33 +5,33 @@
 训练时不再使用预分配CSV, 由 data_processor.random_train_val_split() 动态分割。
 
 用法:
-    cd F:/桌面/test3 && python training/scripts/generate_annotations.py
+    cd heroesagent-training && python scripts/generate_annotations.py
 
 生成:
-    - training/data/annotations/full.csv       完整标注
-    - training/data/annotations/summary.json   数据集摘要
+    - data/annotations/full.csv       完整标注
+    - data/annotations/summary.json   数据集摘要
 """
 
 import json
 import sys
 from pathlib import Path
 
-sys.stdout.reconfigure(encoding='utf-8')
+# 将scripts目录加入sys.path, 支持直接导入同级模块 (不依赖父目录名)
+SCRIPT_DIR = Path(__file__).parent
+sys.path.insert(0, str(SCRIPT_DIR))
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-TRAINING_ROOT = PROJECT_ROOT / "training"
-
-sys.path.insert(0, str(PROJECT_ROOT))
-
-from training.scripts.data_processor import (
-    discover_images, save_annotations, save_summary,
+from data_processor import (
+    discover_images, save_annotations,
 )
+
+# 项目根目录 (heroesagent-training/)
+PROJECT_ROOT = SCRIPT_DIR.parent
 
 
 def generate_annotations() -> None:
     """扫描图片目录, 生成完整标注CSV和摘要。"""
-    images_dir = TRAINING_ROOT / "data" / "images"
-    annotations_dir = TRAINING_ROOT / "data" / "annotations"
+    images_dir = PROJECT_ROOT / "data" / "images"
+    annotations_dir = PROJECT_ROOT / "data" / "annotations"
 
     if not images_dir.exists():
         print(f"[ERROR] 图片目录不存在: {images_dir}")

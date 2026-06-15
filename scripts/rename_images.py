@@ -4,14 +4,15 @@
 重命名为 {id}_{序号}.png
 
 用法:
-    python training/scripts/rename_images.py
+    cd heroesagent-training && python scripts/rename_images.py
 """
 
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-IMAGES_DIR = PROJECT_ROOT / "training" / "data" / "images"
+SCRIPT_DIR = Path(__file__).parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+IMAGES_DIR = PROJECT_ROOT / "data" / "images"
 
 
 def rename_images() -> None:
@@ -29,15 +30,12 @@ def rename_images() -> None:
 
     for subdir in subdirs:
         creature_id = int(subdir.name)
-        # 获取该文件夹下所有png文件，按原名排序以保证序号稳定
         png_files = sorted(subdir.glob("*.png"))
 
-        # 分离已规范命名和待重命名的文件
         already_ok = set()
         to_rename = []
 
         for f in png_files:
-            # 规范格式: {id}_{idx}.png
             parts = f.stem.split("_", 1)
             if len(parts) == 2 and parts[0] == subdir.name and parts[1].isdigit():
                 already_ok.add(int(parts[1]))
@@ -47,13 +45,11 @@ def rename_images() -> None:
         if not to_rename:
             continue
 
-        # 从已有序号之后开始编号
         next_idx = max(already_ok) + 1 if already_ok else 0
 
         for old_file in to_rename:
             new_name = f"{subdir.name}_{next_idx}.png"
             new_path = subdir / new_name
-            # 防止覆盖已存在的文件
             while new_path.exists():
                 next_idx += 1
                 new_name = f"{subdir.name}_{next_idx}.png"
