@@ -2,31 +2,25 @@
 
 支持:
 - CPU / GPU 自动检测, 混合精度训练(AMP)
-- 多种模型: efficientnet_b0, mobilenet_v3_large, resnet18 等
-- checkpoint保存, Early Stopping, 学习率调度
+- 多种模型: mobilenet_v3_large, efficientnet_b0, resnet18 等
+- checkpoint保存, Early Stopping, 学习率调度(Warmup+Cosine)
 - loss-epoch曲线, 准确率曲线, 混淆矩阵自动生成
 - 小数据集友好 (Gradient Clipping, Label Smoothing, 数据增强)
 - ONNX导出 (用于量化部署)
 
+数据分割: 每次训练动态随机分割 (5:1 训练:验证), 不使用预分配CSV。
+
 用法:
-    # 基础训练
     python training/scripts/train.py
-
-    # 指定模型和参数
     python training/scripts/train.py --model mobilenet_v3_large --epochs 50 --batch_size 64
-
-    # CPU训练 (仅测试流程)
-    python training/scripts/train.py --device cpu --batch_size 16 --epochs 5
-
-    # 仅评估已有模型
+    python training/scripts/train.py --device cpu --batch_size 16 --epochs 5 --no_amp
     python training/scripts/train.py --evaluate training/outputs/best_mobilenet_v3_large.pth
-
-    # 导出ONNX
     python training/scripts/train.py --export_onnx training/outputs/best_mobilenet_v3_large.pth
 """
 
 import argparse
 import json
+import math
 import sys
 import time
 from datetime import datetime
@@ -41,138 +35,22 @@ from torch.utils.data import DataLoader
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 TRAINING_ROOT = PROJECT_ROOT / "training"
 DEFAULT_DATA_DIR = TRAINING_ROOT / "data"
+ANNOTATIONS_DIR = DEFAULT_DATA_DIR / "annotations"
+IMAGES_DIR = DEFAULT_DATA_DIR / "images"
 OUTPUTS_DIR = TRAINING_ROOT / "outputs"
 
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from training.scripts.dataset import CreatureDataset, get_default_transforms
+from training.scripts.data_processor import (
+    discover_images, random_train_val_split,
+    save_annotations, save_summary, print_split_summary,
+)
+from training.scripts.model_factory import build_model
+from training.scripts.train_loop import train_epoch, validate_epoch
 
-
-# ============================================================
-# 模型工厂
-# ============================================================
-
-def build_model(model_name: str, num_classes: int, pretrained: bool = True) -> nn.Module:
-    """构建分类模型,自动替换分类头。
-
-    Args:
-        model_name: torchvision模型名
-        num_classes: 分类数
-        pretrained: 是否使用ImageNet预训练权重
-
-    Returns:
-        替换了分类头的模型
-    """
-    import torchvision.models as models
-
-    model_func = getattr(models, model_name, None)
-    if model_func is None:
-        available = [m for m in dir(models)
-                     if m[0].islower() and not m.startswith("_")]
-        raise ValueError(f"未知模型: {model_name}\n可用: {', '.join(available)}")
-
-    weights = "IMAGENET1K_V1" if pretrained else None
-    model = model_func(weights=weights)
-
-    if hasattr(model, "classifier"):
-        if isinstance(model.classifier, nn.Sequential):
-            in_features = model.classifier[-1].in_features
-            model.classifier[-1] = nn.Linear(in_features, num_classes)
-        else:
-            in_features = model.classifier.in_features
-            model.classifier = nn.Linear(in_features, num_classes)
-    elif hasattr(model, "fc"):
-        in_features = model.fc.in_features
-        model.fc = nn.Linear(in_features, num_classes)
-    elif hasattr(model, "head"):
-        in_features = model.head.in_features
-        model.head = nn.Linear(in_features, num_classes)
-    else:
-        raise ValueError(f"无法找到模型分类头: {model_name}")
-
-    return model
-
-
-# ============================================================
-# 训练/验证循环
-# ============================================================
-
-def train_epoch(
-    model: nn.Module,
-    loader: DataLoader,
-    criterion: nn.Module,
-    optimizer: optim.Optimizer,
-    device: torch.device,
-    scaler: Optional["torch.amp.GradScaler"] = None,
-    clip_grad: float = 1.0,
-) -> tuple[float, float]:
-    """训练一个epoch, 返回(loss, accuracy)。"""
-    model.train()
-    running_loss = 0.0
-    correct = 0
-    total = 0
-    use_amp = scaler is not None
-
-    for images, labels in loader:
-        images, labels = images.to(device), labels.to(device)
-        optimizer.zero_grad()
-
-        if use_amp:
-            with torch.amp.autocast("cuda"):
-                outputs = model(images)
-                loss = criterion(outputs, labels)
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), clip_grad)
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), clip_grad)
-            optimizer.step()
-
-        running_loss += loss.item() * images.size(0)
-        _, predicted = outputs.max(1)
-        total += labels.size(0)
-        correct += predicted.eq(labels).sum().item()
-
-    epoch_loss = running_loss / total
-    epoch_acc = 100.0 * correct / total
-    return epoch_loss, epoch_acc
-
-
-@torch.no_grad()
-def validate_epoch(
-    model: nn.Module,
-    loader: DataLoader,
-    criterion: nn.Module,
-    device: torch.device,
-) -> tuple[float, float, list[int], list[int]]:
-    """验证一个epoch, 返回(loss, accuracy, predictions, labels)。"""
-    model.eval()
-    running_loss = 0.0
-    correct = 0
-    total = 0
-    all_preds: list[int] = []
-    all_labels: list[int] = []
-
-    for images, labels in loader:
-        images, labels = images.to(device), labels.to(device)
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-
-        running_loss += loss.item() * images.size(0)
-        _, predicted = outputs.max(1)
-        total += labels.size(0)
-        correct += predicted.eq(labels).sum().item()
-        all_preds.extend(predicted.cpu().tolist())
-        all_labels.extend(labels.cpu().tolist())
-
-    epoch_loss = running_loss / total
-    epoch_acc = 100.0 * correct / total
-    return epoch_loss, epoch_acc, all_preds, all_labels
+# 向后兼容: battlefield_detector 通过 sys.path 导入
+# from train import build_model 仍然有效 (此文件re-export)
 
 
 # ============================================================
@@ -180,7 +58,13 @@ def validate_epoch(
 # ============================================================
 
 def train(args: argparse.Namespace) -> dict:
-    """执行完整训练流程,返回训练历史记录。"""
+    """执行完整训练流程, 返回训练历史记录。
+
+    数据流程:
+      1. 扫描 images/ 目录发现所有图片
+      2. 按5:1随机分割训练/验证集 (每类保证验证≥1)
+      3. 构建模型并训练
+    """
     # --- 设备 ---
     if args.device == "cpu":
         device = torch.device("cpu")
@@ -195,40 +79,45 @@ def train(args: argparse.Namespace) -> dict:
         print(f"[训练] 显存: {mem_gb:.1f}GB")
         use_amp = not args.no_amp
 
-    # --- 数据集 ---
+    # --- 数据发现 & 动态分割 ---
     data_dir = Path(args.data_dir)
-    train_csv = data_dir / "annotations" / "train.csv"
-    val_csv = data_dir / "annotations" / "val.csv"
     images_dir = data_dir / "images"
+    annotations_dir = data_dir / "annotations"
 
-    if not train_csv.exists():
-        raise FileNotFoundError(
-            f"训练标注不存在: {train_csv}\n"
-            f"请先运行: python training/scripts/generate_annotations.py"
-        )
+    print(f"\n[数据] 扫描图片目录: {images_dir}")
+    all_samples = discover_images(str(images_dir))
+    print(f"[数据] 发现 {len(all_samples)} 张图片, "
+          f"{len(set(s['label_index'] for s in all_samples))} 个类别")
 
-    train_dataset = CreatureDataset(
-        str(train_csv), str(images_dir),
+    train_anns, val_anns = random_train_val_split(
+        all_samples, train_ratio=5 / 6, random_seed=args.seed,
+    )
+    print_split_summary(all_samples, train_anns, val_anns)
+
+    # 保存本次分割结果 (可复现)
+    annotations_dir.mkdir(parents=True, exist_ok=True)
+    save_annotations(train_anns, annotations_dir, "train")
+    save_annotations(val_anns, annotations_dir, "val")
+    save_annotations(all_samples, annotations_dir, "full")
+    save_summary(all_samples, train_anns, val_anns, annotations_dir)
+
+    # --- 总类别数 ---
+    num_classes = CreatureDataset.get_total_classes(
+        str(annotations_dir / "creature_index.xlsx")
+    )
+    print(f"[训练] 模型类别数: {num_classes} (来自creature_index.xlsx)")
+
+    # --- 数据集 ---
+    train_dataset = CreatureDataset.from_annotations(
+        train_anns, str(images_dir),
         transform=get_default_transforms(train=True, input_size=args.input_size),
         target_size=args.input_size,
     )
-
-    val_exists = val_csv.exists()
-    if val_exists:
-        val_dataset = CreatureDataset(
-            str(val_csv), str(images_dir),
-            transform=get_default_transforms(train=False, input_size=args.input_size),
-            target_size=args.input_size,
-        )
-    else:
-        val_dataset = None
-
-    num_classes = CreatureDataset.get_total_classes(
-        str(data_dir / "annotations" / "creature_index.xlsx")
+    val_dataset = CreatureDataset.from_annotations(
+        val_anns, str(images_dir),
+        transform=get_default_transforms(train=False, input_size=args.input_size),
+        target_size=args.input_size,
     )
-    print(f"[训练] 训练集: {len(train_dataset)} 张, "
-          f"验证集: {len(val_dataset) if val_dataset else 0} 张")
-    print(f"[训练] 类别数: {num_classes} (来自creature_index.xlsx)")
 
     if len(train_dataset) < 50:
         print(f"[训练] [WARN] 训练集很小 ({len(train_dataset)}张), "
@@ -239,13 +128,11 @@ def train(args: argparse.Namespace) -> dict:
         shuffle=True, num_workers=args.num_workers,
         pin_memory=(device.type == "cuda"), drop_last=True,
     )
-    val_loader = None
-    if val_dataset and len(val_dataset) > 0:
-        val_loader = DataLoader(
-            val_dataset, batch_size=min(args.batch_size, len(val_dataset)),
-            shuffle=False, num_workers=args.num_workers,
-            pin_memory=(device.type == "cuda"),
-        )
+    val_loader = DataLoader(
+        val_dataset, batch_size=min(args.batch_size, len(val_dataset)),
+        shuffle=False, num_workers=args.num_workers,
+        pin_memory=(device.type == "cuda"),
+    ) if len(val_dataset) > 0 else None
 
     # --- 模型 ---
     model = build_model(args.model, num_classes, pretrained=not args.no_pretrain)
@@ -261,18 +148,15 @@ def train(args: argparse.Namespace) -> dict:
         model.parameters(), lr=args.lr, weight_decay=args.weight_decay,
     )
 
-    # 使用线性warmup + cosine退火
-    from torch.optim.lr_scheduler import LambdaLR
     warmup_epochs = args.warmup_epochs
 
     def lr_lambda(epoch: int) -> float:
         if epoch < warmup_epochs:
             return (epoch + 1) / warmup_epochs
         progress = (epoch - warmup_epochs) / max(1, args.epochs - warmup_epochs)
-        import math
         return 0.5 * (1 + math.cos(math.pi * progress))
 
-    scheduler = LambdaLR(optimizer, lr_lambda)
+    scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
     # 混合精度
     scaler = torch.amp.GradScaler("cuda") if use_amp else None
@@ -287,7 +171,7 @@ def train(args: argparse.Namespace) -> dict:
         "best_epoch": 0,
         "num_classes": num_classes,
         "train_samples": len(train_dataset),
-        "val_samples": len(val_dataset) if val_dataset else 0,
+        "val_samples": len(val_dataset),
         "timestamp": datetime.now().isoformat(),
     }
 
@@ -323,7 +207,8 @@ def train(args: argparse.Namespace) -> dict:
         lr_now = optimizer.param_groups[0]["lr"]
         t_elapsed = time.time() - t_start
 
-        val_str = f"V Loss: {val_loss:.4f} | V Acc: {val_acc:.2f}%" if val_loader else "V: N/A"
+        val_str = (f"V Loss: {val_loss:.4f} | V Acc: {val_acc:.2f}%"
+                   if val_loader else "V: N/A")
         print(f"Epoch {epoch:3d}/{args.epochs} | LR: {lr_now:.1e} | "
               f"T Loss: {train_loss:.4f} | T Acc: {train_acc:.2f}% | "
               f"{val_str} | {t_elapsed:.1f}s")
@@ -366,12 +251,6 @@ def train(args: argparse.Namespace) -> dict:
     # 生成图表
     plot_training_curves(history, args.model)
 
-    # 测试集评估 (如果存在)
-    test_csv = data_dir / "annotations" / "test.csv"
-    if test_csv.exists():
-        print(f"\n[评估] 在测试集上评估最佳模型...")
-        evaluate_model(str(best_model_path), args.model, device, args.input_size, args.data_dir)
-
     return history
 
 
@@ -390,7 +269,6 @@ def plot_training_curves(history: dict, model_name: str) -> None:
         plt.rcParams["axes.unicode_minus"] = False
 
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
-
         epochs = range(1, len(history["train_loss"]) + 1)
 
         # Loss曲线
@@ -442,21 +320,23 @@ def evaluate_model(
     model_path: str, model_name: str, device: torch.device,
     input_size: int = 224, data_dir: str = "",
 ) -> dict:
-    """在测试集上评估已训练模型,生成混淆矩阵。"""
+    """在验证集上评估已训练模型, 生成混淆矩阵。
+
+    使用动态随机分割生成验证集 (不使用预分配test.csv)。
+    """
     ddir = Path(data_dir) if data_dir else DEFAULT_DATA_DIR
-    test_csv = ddir / "annotations" / "test.csv"
     images_dir = ddir / "images"
 
-    if not test_csv.exists():
-        print("[评估] 测试集不存在,跳过评估")
-        return {}
+    # 动态分割: 随机取一部分作为评估集
+    all_samples = discover_images(str(images_dir))
+    _, val_anns = random_train_val_split(all_samples, train_ratio=5 / 6, random_seed=42)
 
-    test_dataset = CreatureDataset(
-        str(test_csv), str(images_dir),
+    val_dataset = CreatureDataset.from_annotations(
+        val_anns, str(images_dir),
         transform=get_default_transforms(train=False, input_size=input_size),
         target_size=input_size,
     )
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
     num_classes = CreatureDataset.get_total_classes(
         str(ddir / "annotations" / "creature_index.xlsx")
@@ -472,7 +352,7 @@ def evaluate_model(
     all_preds: list[int] = []
     all_labels: list[int] = []
 
-    for images, labels in test_loader:
+    for images, labels in loader:
         images, labels = images.to(device), labels.to(device)
         outputs = model(images)
         _, predicted = outputs.max(1)
@@ -483,11 +363,11 @@ def evaluate_model(
 
     acc = 100.0 * correct / total
     result = {
-        "test_accuracy": acc,
-        "test_samples": total,
-        "test_correct": correct,
+        "val_accuracy": acc,
+        "val_samples": total,
+        "val_correct": correct,
     }
-    print(f"[评估] 测试准确率: {acc:.2f}% ({correct}/{total})")
+    print(f"[评估] 验证准确率: {acc:.2f}% ({correct}/{total})")
 
     # 保存评估结果
     result_path = OUTPUTS_DIR / f"eval_{model_name}.json"
@@ -511,7 +391,6 @@ def plot_confusion_matrix(labels: list[int], preds: list[int], model_name: str) 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         from sklearn.metrics import confusion_matrix
-        import numpy as np
 
         cm = confusion_matrix(labels, preds)
         classes = sorted(set(labels))
@@ -520,12 +399,12 @@ def plot_confusion_matrix(labels: list[int], preds: list[int], model_name: str) 
                                         max(10, len(classes) * 0.3)))
         im = ax.imshow(cm, cmap="Blues", aspect="auto")
 
-        # 只标注非零
         for i in range(len(classes)):
             for j in range(len(classes)):
                 if cm[i, j] > 0:
                     ax.text(j, i, str(cm[i, j]), ha="center", va="center",
-                            fontsize=6, color="white" if cm[i, j] > cm.max() / 2 else "black")
+                            fontsize=6, color="white" if cm[i, j] > cm.max() / 2
+                            else "black")
 
         ax.set_xlabel("Predicted")
         ax.set_ylabel("True")
@@ -599,6 +478,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--clip_grad", type=float, default=1.0,
                         help="梯度裁剪阈值 (默认: 1.0)")
     parser.add_argument("--input_size", type=int, default=224)
+    parser.add_argument("--seed", type=int, default=None,
+                        help="随机种子 (None=每次不同)")
     parser.add_argument("--device", type=str, default="auto",
                         choices=["auto", "cpu", "cuda"])
     parser.add_argument("--num_workers", type=int, default=2)

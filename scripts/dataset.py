@@ -54,6 +54,40 @@ class CreatureDataset(Dataset):
         if not self.samples:
             raise ValueError(f"CSV文件无有效数据: {csv_path}")
 
+    @classmethod
+    def from_annotations(
+        cls,
+        annotations: list[dict],
+        images_dir: str,
+        transform: Optional[Callable] = None,
+        target_size: int = 224,
+    ) -> "CreatureDataset":
+        """从标注列表直接创建数据集 (无需CSV文件)。
+
+        Args:
+            annotations: [{"image": "0/0_0.png", "label_index": 0}, ...]
+            images_dir: 图片所在根目录
+            transform: torchvision transforms
+            target_size: 模型输入尺寸
+        """
+        dataset = cls.__new__(cls)
+        dataset.images_dir = Path(images_dir)
+        dataset.transform = transform
+        dataset.target_size = target_size
+        dataset.samples = [
+            {
+                "image": a["image"],
+                "label_index": int(a["label_index"]),
+                "name_en": a.get("name_en", ""),
+                "name_zh": a.get("name_zh", ""),
+                "faction": a.get("faction", ""),
+            }
+            for a in annotations
+        ]
+        if not dataset.samples:
+            raise ValueError("标注列表为空")
+        return dataset
+
     def __len__(self) -> int:
         return len(self.samples)
 
