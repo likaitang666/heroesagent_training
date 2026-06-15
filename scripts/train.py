@@ -27,6 +27,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+sys.stdout.reconfigure(encoding='utf-8')
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -335,6 +337,7 @@ def evaluate_model(
         val_anns, str(images_dir),
         transform=get_default_transforms(train=False, input_size=input_size),
         target_size=input_size,
+        num_classes=191,
     )
     loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
@@ -440,7 +443,7 @@ def export_onnx(model_path: str, model_name: str,
         output_path = str(OUTPUTS_DIR / f"{model_name}.onnx")
 
     checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
-    num_classes = checkpoint.get("history", {}).get("num_classes", 189)
+    num_classes = checkpoint.get("history", {}).get("num_classes", 191)
     model = build_model(model_name, num_classes, pretrained=False)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()

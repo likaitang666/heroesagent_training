@@ -28,16 +28,21 @@ class CreatureDataset(Dataset):
         image 列存储相对路径如 "0/0_0.png"
     """
 
+    # 总类别数 (189兵种 + 障碍物 + 空地)
+    TOTAL_CLASSES = 191
+
     def __init__(
         self,
         csv_path: str,
         images_dir: str,
         transform: Optional[Callable] = None,
         target_size: int = 224,
+        num_classes: int = 191,
     ):
         self.images_dir = Path(images_dir)
         self.transform = transform
         self.target_size = target_size
+        self._num_classes = num_classes
 
         self.samples: list[dict] = []
         with open(csv_path, encoding="utf-8") as f:
@@ -114,7 +119,8 @@ class CreatureDataset(Dataset):
 
     @property
     def num_classes(self) -> int:
-        return len(set(s["label_index"] for s in self.samples))
+        """总类别数 (191 = 189兵种 + 障碍物 + 空地)。"""
+        return self._num_classes
 
     @staticmethod
     def get_total_classes(xlsx_path: Optional[str] = None) -> int:
