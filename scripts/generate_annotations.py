@@ -52,12 +52,12 @@ def generate_annotations() -> None:
     full_csv = save_annotations(samples, annotations_dir, "full")
     print(f"  完整标注: {full_csv}")
 
-    # 保存摘要
+    # 保存摘要 (使用相对路径避免跨环境问题)
     summary_path = annotations_dir / "summary.json"
     summary = {
         "total_images": len(samples),
         "num_classes": num_classes,
-        "images_dir": str(images_dir),
+        "images_dir": "data/images",
     }
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(summary, ensure_ascii=False, indent=2, fp=f)
