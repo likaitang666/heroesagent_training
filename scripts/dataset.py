@@ -88,6 +88,23 @@ class CreatureDataset(Dataset):
         """总类别数 (191 = 189兵种 + 障碍物 + 空地)。"""
         return self._num_classes
 
+    @staticmethod
+    def get_total_classes(xlsx_path: Optional[str] = None) -> int:
+        """从creature_index.xlsx获取总类别数 (默认191)。"""
+        if xlsx_path is None:
+            xlsx_path = str(
+                Path(__file__).parent.parent / "data" / "annotations" / "creature_index.xlsx"
+            )
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(xlsx_path, read_only=True)
+            ws = wb.active
+            count = sum(1 for _ in ws.iter_rows(min_row=2, values_only=True))
+            wb.close()
+            return max(count, 1)
+        except Exception:
+            return len(set(s["label_index"] for s in self.samples))
+
 
 def get_default_transforms(train: bool = True, input_size: int = 224):
     """获取默认数据增强pipeline。
