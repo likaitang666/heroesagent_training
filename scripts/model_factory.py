@@ -3,7 +3,7 @@
 支持 torchvision 所有分类模型, 自动替换分类头以适配自定义类别数。
 
 用法:
-    from training.scripts.model_factory import build_model
+    from model_factory import build_model
     model = build_model("mobilenet_v3_large", num_classes=191)
 """
 

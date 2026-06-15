@@ -11,11 +11,12 @@
 数据分割: 每次训练动态随机分割 (5:1 训练:验证), 不使用预分配CSV。
 
 用法:
-    python training/scripts/train.py
-    python training/scripts/train.py --model mobilenet_v3_large --epochs 50 --batch_size 64
-    python training/scripts/train.py --device cpu --batch_size 16 --epochs 5 --no_amp
-    python training/scripts/train.py --evaluate training/outputs/best_mobilenet_v3_large.pth
-    python training/scripts/train.py --export_onnx training/outputs/best_mobilenet_v3_large.pth
+    cd heroesagent-training
+    python scripts/train.py
+    python scripts/train.py --model mobilenet_v3_large --epochs 50 --batch_size 64
+    python scripts/train.py --device cpu --batch_size 16 --epochs 5 --no_amp
+    python scripts/train.py --evaluate outputs/best_mobilenet_v3_large.pth
+    python scripts/train.py --export_onnx outputs/best_mobilenet_v3_large.pth
 """
 
 import argparse
@@ -32,25 +33,24 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-TRAINING_ROOT = PROJECT_ROOT / "training"
-DEFAULT_DATA_DIR = TRAINING_ROOT / "data"
-ANNOTATIONS_DIR = DEFAULT_DATA_DIR / "annotations"
-IMAGES_DIR = DEFAULT_DATA_DIR / "images"
-OUTPUTS_DIR = TRAINING_ROOT / "outputs"
+# 将scripts目录加入sys.path, 支持直接导入同级模块 (不依赖父目录名)
+SCRIPT_DIR = Path(__file__).parent
+sys.path.insert(0, str(SCRIPT_DIR))
 
-sys.path.insert(0, str(PROJECT_ROOT))
-
-from training.scripts.dataset import CreatureDataset, get_default_transforms
-from training.scripts.data_processor import (
+from dataset import CreatureDataset, get_default_transforms
+from data_processor import (
     discover_images, random_train_val_split,
     save_annotations, save_summary, print_split_summary,
 )
-from training.scripts.model_factory import build_model
-from training.scripts.train_loop import train_epoch, validate_epoch
+from model_factory import build_model
+from train_loop import train_epoch, validate_epoch
 
-# 向后兼容: battlefield_detector 通过 sys.path 导入
-# from train import build_model 仍然有效 (此文件re-export)
+# 项目根目录 (heroesagent-training/)
+PROJECT_ROOT = SCRIPT_DIR.parent
+DEFAULT_DATA_DIR = PROJECT_ROOT / "data"
+ANNOTATIONS_DIR = DEFAULT_DATA_DIR / "annotations"
+IMAGES_DIR = DEFAULT_DATA_DIR / "images"
+OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
 
 # ============================================================
@@ -320,14 +320,10 @@ def evaluate_model(
     model_path: str, model_name: str, device: torch.device,
     input_size: int = 224, data_dir: str = "",
 ) -> dict:
-    """在验证集上评估已训练模型, 生成混淆矩阵。
-
-    使用动态随机分割生成验证集 (不使用预分配test.csv)。
-    """
+    """在验证集上评估已训练模型, 生成混淆矩阵。"""
     ddir = Path(data_dir) if data_dir else DEFAULT_DATA_DIR
     images_dir = ddir / "images"
 
-    # 动态分割: 随机取一部分作为评估集
     all_samples = discover_images(str(images_dir))
     _, val_anns = random_train_val_split(all_samples, train_ratio=5 / 6, random_seed=42)
 
@@ -369,12 +365,10 @@ def evaluate_model(
     }
     print(f"[评估] 验证准确率: {acc:.2f}% ({correct}/{total})")
 
-    # 保存评估结果
     result_path = OUTPUTS_DIR / f"eval_{model_name}.json"
     with open(result_path, "w", encoding="utf-8") as f:
         json.dump(result, ensure_ascii=False, indent=2, fp=f)
 
-    # 生成混淆矩阵图 (只在样本足够时)
     if total >= 10 and len(set(all_labels)) >= 3:
         try:
             plot_confusion_matrix(all_labels, all_preds, model_name)
@@ -426,15 +420,12 @@ def plot_confusion_matrix(labels: list[int], preds: list[int], model_name: str) 
 
 def export_onnx(model_path: str, model_name: str,
                 output_path: Optional[str] = None) -> str:
-    """导出模型为ONNX格式, 用于ONNX Runtime推理和量化。
+    """导出模型为ONNX格式。
 
     Args:
         model_path: .pth checkpoint路径
         model_name: torchvision模型名
         output_path: 输出ONNX路径 (默认: outputs/{model_name}.onnx)
-
-    Returns:
-        输出的ONNX文件路径
     """
     if output_path is None:
         output_path = str(OUTPUTS_DIR / f"{model_name}.onnx")
@@ -467,30 +458,22 @@ def parse_args() -> argparse.Namespace:
                         help="torchvision模型名 (默认: mobilenet_v3_large)")
     parser.add_argument("--data_dir", type=str, default=str(DEFAULT_DATA_DIR),
                         help=f"数据目录路径 (默认: {DEFAULT_DATA_DIR})")
-    parser.add_argument("--epochs", type=int, default=50,
-                        help="训练轮数 (默认: 50)")
-    parser.add_argument("--batch_size", type=int, default=64,
-                        help="批次大小 (默认: 64, CPU建议16)")
-    parser.add_argument("--lr", type=float, default=3e-4,
-                        help="学习率 (默认: 3e-4)")
+    parser.add_argument("--epochs", type=int, default=50)
+    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--weight_decay", type=float, default=1e-4)
     parser.add_argument("--label_smoothing", type=float, default=0.1)
-    parser.add_argument("--clip_grad", type=float, default=1.0,
-                        help="梯度裁剪阈值 (默认: 1.0)")
+    parser.add_argument("--clip_grad", type=float, default=1.0)
     parser.add_argument("--input_size", type=int, default=224)
     parser.add_argument("--seed", type=int, default=None,
                         help="随机种子 (None=每次不同)")
     parser.add_argument("--device", type=str, default="auto",
                         choices=["auto", "cpu", "cuda"])
     parser.add_argument("--num_workers", type=int, default=2)
-    parser.add_argument("--early_stop", type=int, default=10,
-                        help="Early stopping patience (0=关闭)")
-    parser.add_argument("--warmup_epochs", type=int, default=3,
-                        help="学习率warmup轮数 (默认: 3)")
-    parser.add_argument("--no_pretrain", action="store_true",
-                        help="不使用预训练权重")
-    parser.add_argument("--no_amp", action="store_true",
-                        help="禁用混合精度训练")
+    parser.add_argument("--early_stop", type=int, default=10)
+    parser.add_argument("--warmup_epochs", type=int, default=3)
+    parser.add_argument("--no_pretrain", action="store_true")
+    parser.add_argument("--no_amp", action="store_true")
     parser.add_argument("--evaluate", type=str, default=None,
                         help="仅评估: 指定模型.pth路径")
     parser.add_argument("--export_onnx", type=str, default=None,

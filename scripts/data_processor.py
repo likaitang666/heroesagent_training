@@ -4,10 +4,10 @@
 保证每类至少有1个验证样本 (除非该类仅有1张图)。
 
 用法:
-    from training.scripts.data_processor import (
+    from data_processor import (
         discover_images, random_train_val_split, save_annotations,
     )
-    samples = discover_images("training/data/images")
+    samples = discover_images("data/images")
     train, val = random_train_val_split(samples, train_ratio=5/6)
 """
 

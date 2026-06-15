@@ -73,10 +73,10 @@ if torch.cuda.is_available():
 !pip install matplotlib openpyxl -q
 
 # ========== Cell 3: 开始训练 ==========
-!python scripts/train.py \
-    --data_dir /kaggle/input/herosagent-training/data \
+!python <datasetpath>/heroesagent-training/scripts/train.py \
+    --data_dir <datasetpath>/heroesagent-training/data \
     --model mobilenet_v3_large \
-    --epochs 50 \
+    --epochs 10 \
     --batch_size 64 \
     --lr 3e-4 \
     --warmup_epochs 3 \
@@ -87,17 +87,17 @@ if torch.cuda.is_available():
 
 ```python
 import sys
-sys.path.insert(0, '/kaggle/working/training')
-from training.scripts.train import train
 import argparse
+sys.path.insert(0, '<datasetpath>/heroesagent-training/scripts')
+from train import train
 
 args = argparse.Namespace(
     model='mobilenet_v3_large',
-    data_dir='/kaggle/input/herosagent-training/data',
-    epochs=50, batch_size=64, lr=3e-4,
+    data_dir='<datasetpath>/heroesagent-training/data',
+    epochs=10, batch_size=64, lr=3e-4,
     weight_decay=1e-4, label_smoothing=0.1,
     clip_grad=1.0, input_size=224,
-    device='auto', num_workers=2,
+    seed=42, device='auto', num_workers=2,
     early_stop=10, warmup_epochs=3,
     no_pretrain=False, no_amp=False,
 )
