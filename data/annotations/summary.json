@@ -1,6 +1,6 @@
 {
-  "total_images": 649,
-  "num_classes": 10,
+  "total_images": 1845,
+  "num_classes": 29,
   "classes": [
     0,
     1,
@@ -11,20 +11,39 @@
     6,
     7,
     8,
-    9
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28
   ],
   "splits": {
     "train": {
-      "count": 450,
-      "classes": 10
+      "count": 1281,
+      "classes": 29
     },
     "val": {
-      "count": 97,
-      "classes": 10
+      "count": 272,
+      "classes": 29
     },
     "test": {
-      "count": 102,
-      "classes": 10
+      "count": 292,
+      "classes": 29
     }
   },
   "images_dir": "F:\\桌面\\test3\\training\\data\\images"

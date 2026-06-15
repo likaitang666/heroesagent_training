@@ -1,107 +1,71 @@
-"""将兵种图片从 creature_{name}.png 重命名为 {label_index}_{index}.png 格式。
+"""重命名图片为规范格式 {兵种编号}_{序号}.png
+
+将 data/images/{id}/ 下的 QQ截图...png 等非规范命名的文件
+重命名为 {id}_{序号}.png
 
 用法:
-    cd F:/桌面/test3 && python training/scripts/rename_images.py [--dry-run]
+    python training/scripts/rename_images.py
 """
 
-import json
 import sys
 from pathlib import Path
-from collections import defaultdict
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
-
-IMAGES_SRC = PROJECT_ROOT / "images" / "creatures"
-IMAGES_DST = PROJECT_ROOT / "training" / "data" / "images"
-LABELS_FILE = PROJECT_ROOT / "gamedata" / "creature_labels.json"
+IMAGES_DIR = PROJECT_ROOT / "training" / "data" / "images"
 
 
-def _normalize(s: str) -> str:
-    return s.lower().replace(" ", "_").replace("-", "_").replace("'", "")
+def rename_images() -> None:
+    """遍历所有兵种文件夹，将非规范命名的png文件重命名。"""
+    if not IMAGES_DIR.exists():
+        print(f"[ERROR] 图片目录不存在: {IMAGES_DIR}")
+        sys.exit(1)
 
+    subdirs = sorted(
+        [d for d in IMAGES_DIR.iterdir() if d.is_dir() and d.name.isdigit()],
+        key=lambda d: int(d.name),
+    )
 
-def match_image_to_label(
-    image_stem: str, labels: list[dict]
-) -> dict | None:
-    """匹配图片文件名到标签,使用最长匹配策略。"""
-    norm_stem = _normalize(image_stem)
-    best_label: dict | None = None
-    best_len = 0
+    total_renamed = 0
 
-    for label in labels:
-        name_en = _normalize(label["name_en"])
-        expected = f"creature_{name_en}"
-        if norm_stem == expected:
-            return label
-        if name_en in norm_stem:
-            if len(name_en) > best_len:
-                best_label = label
-                best_len = len(name_en)
-    return best_label
+    for subdir in subdirs:
+        creature_id = int(subdir.name)
+        # 获取该文件夹下所有png文件，按原名排序以保证序号稳定
+        png_files = sorted(subdir.glob("*.png"))
 
+        # 分离已规范命名和待重命名的文件
+        already_ok = set()
+        to_rename = []
 
-def rename_images(dry_run: bool = False) -> dict:
-    """重命名所有兵种图片为 {label_index}_{index}.png 格式。"""
-    with open(LABELS_FILE, encoding="utf-8") as f:
-        labels_data = json.load(f)
-    labels = labels_data["labels"]
+        for f in png_files:
+            # 规范格式: {id}_{idx}.png
+            parts = f.stem.split("_", 1)
+            if len(parts) == 2 and parts[0] == subdir.name and parts[1].isdigit():
+                already_ok.add(int(parts[1]))
+            else:
+                to_rename.append(f)
 
-    image_files = sorted(IMAGES_SRC.glob("*.png"))
-    per_class: dict[int, list[Path]] = defaultdict(list)
+        if not to_rename:
+            continue
 
-    unmatched: list[str] = []
-    for img_path in image_files:
-        label = match_image_to_label(img_path.stem, labels)
-        if label:
-            per_class[label["label"]].append(img_path)
-        else:
-            unmatched.append(img_path.name)
+        # 从已有序号之后开始编号
+        next_idx = max(already_ok) + 1 if already_ok else 0
 
-    renamed: list[tuple[str, str]] = []
-    for label_idx in sorted(per_class.keys()):
-        for i, img_path in enumerate(per_class[label_idx]):
-            ext = img_path.suffix
-            new_name = f"{label_idx}_{i}{ext}"
-            new_path = img_path.parent / new_name
-            renamed.append((img_path.name, new_name))
-            if not dry_run:
-                img_path.rename(new_path)
+        for old_file in to_rename:
+            new_name = f"{subdir.name}_{next_idx}.png"
+            new_path = subdir / new_name
+            # 防止覆盖已存在的文件
+            while new_path.exists():
+                next_idx += 1
+                new_name = f"{subdir.name}_{next_idx}.png"
+                new_path = subdir / new_name
+            old_file.rename(new_path)
+            next_idx += 1
+            total_renamed += 1
 
-    if unmatched:
-        print(f"[WARN] {len(unmatched)} 张图片未匹配: {unmatched}")
+        print(f"  [{subdir.name}/] 重命名 {len(to_rename)} 个文件")
 
-    print(f"[OK] 重命名 {len(renamed)} 张图片 ({'DRY RUN' if dry_run else 'DONE'})")
-    if dry_run:
-        for old, new in renamed[:10]:
-            print(f"  {old} -> {new}")
-        if len(renamed) > 10:
-            print(f"  ... 共 {len(renamed)} 张")
-
-    # 复制到训练目录
-    if not dry_run:
-        IMAGES_DST.mkdir(parents=True, exist_ok=True)
-        copied = 0
-        for img_path in sorted(IMAGES_SRC.glob("*.png")):
-            dst = IMAGES_DST / img_path.name
-            if not dst.exists():
-                import shutil
-                shutil.copy2(img_path, dst)
-                copied += 1
-        print(f"[OK] 复制 {copied} 张图片到: {IMAGES_DST}")
-
-    return {
-        "renamed": len(renamed),
-        "unmatched": len(unmatched),
-        "classes": len(per_class),
-    }
+    print(f"\n总计重命名: {total_renamed} 个文件")
 
 
 if __name__ == "__main__":
-    dry = "--dry-run" in sys.argv
-    if dry:
-        print("=== DRY RUN 模式(不实际修改文件) ===\n")
-    result = rename_images(dry_run=dry)
-    print(f"\n统计: {result['classes']} 个兵种, "
-          f"{result['renamed']} 张图片, "
-          f"{result['unmatched']} 张未匹配")
+    rename_images()

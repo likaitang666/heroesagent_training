@@ -13,16 +13,16 @@
     python training/scripts/train.py
 
     # 指定模型和参数
-    python training/scripts/train.py --model efficientnet_b0 --epochs 50 --batch_size 64
+    python training/scripts/train.py --model mobilenet_v3_large --epochs 50 --batch_size 64
 
     # CPU训练 (仅测试流程)
     python training/scripts/train.py --device cpu --batch_size 16 --epochs 5
 
     # 仅评估已有模型
-    python training/scripts/train.py --evaluate training/outputs/best_efficientnet_b0.pth
+    python training/scripts/train.py --evaluate training/outputs/best_mobilenet_v3_large.pth
 
     # 导出ONNX
-    python training/scripts/train.py --export_onnx training/outputs/best_efficientnet_b0.pth
+    python training/scripts/train.py --export_onnx training/outputs/best_mobilenet_v3_large.pth
 """
 
 import argparse
@@ -584,8 +584,8 @@ def export_onnx(model_path: str, model_name: str,
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="英雄无敌3兵种图像分类 — 模型微调训练")
-    parser.add_argument("--model", type=str, default="efficientnet_b0",
-                        help="torchvision模型名 (默认: efficientnet_b0)")
+    parser.add_argument("--model", type=str, default="mobilenet_v3_large",
+                        help="torchvision模型名 (默认: mobilenet_v3_large)")
     parser.add_argument("--data_dir", type=str, default=str(DEFAULT_DATA_DIR),
                         help=f"数据目录路径 (默认: {DEFAULT_DATA_DIR})")
     parser.add_argument("--epochs", type=int, default=50,

@@ -137,24 +137,13 @@ shutil.make_archive("model_output", "zip", "outputs")
 
 ## 数据集说明
 
-### 当前数据 (10类兵种，649张图片)
+### 当前数据 (191类：189兵种 + 障碍物 + 空地)
 
-图片按兵种分文件夹组织: `data/images/{兵种编号}/{兵种编号}_{序号}.png`
+图片按兵种编号分文件夹组织: `data/images/{编号}/{编号}_{序号}.png`
 
-| 兵种编号 | 图片数 | 训练 | 验证 | 测试 |
-|---------|--------|------|------|------|
-| 0 | 79 | 55 | 11 | 13 |
-| 1 | 64 | 44 | 10 | 10 |
-| 2 | 65 | 45 | 10 | 10 |
-| 3 | 63 | 44 | 9 | 10 |
-| 4 | 63 | 44 | 9 | 10 |
-| 5 | 63 | 44 | 9 | 10 |
-| 6 | 62 | 43 | 9 | 10 |
-| 7 | 64 | 44 | 10 | 10 |
-| 8 | 62 | 43 | 10 | 9 |
-| 9 | 64 | 44 | 10 | 10 |
-| **总计** | **649** | **450** | **97** | **102** |
-
+- **训练数据**: 10类兵种有真实截图 (Factory阵营兵种，编号157-166)，约649张
+- **合成数据**: 障碍物(189)和空地(190)由 `generate_background_data.py` 生成
+- **全部类别**: 模型训练191类，包含全部189兵种 + 障碍物 + 空地
 - 分割比例: 70/15/15（分层分割，每类独立采样）
 - 图片格式: PNG，统一命名 `{兵种编号}_{序号}.png`
 
@@ -180,24 +169,15 @@ python scripts/generate_annotations.py
 
 ## 数据增强
 
-### 离线增强（训练前扩充训练集）
+### 数据增强
 
-```bash
-# 为每张图生成9个增强变体，输出到 data/augmented/
-python scripts/augment_images.py --input data/images --output data/augmented --variations 9
+训练时通过 `dataset.py` 中 `get_default_transforms` 自动应用在线增强:
+- `RandomResizedCrop` (scale 0.7-1.0)
+- `RandomHorizontalFlip` (50%，不包含垂直翻转)
+- `ColorJitter` (亮度/对比度/饱和度)
+- `RandomErasing` (随机遮挡, 20%)
 
-# 预览模式（不实际保存）
-python scripts/augment_images.py --variations 3 --dry_run
-```
-
-增强策略:
-- 水平翻转 (50%) — **不做垂直翻转**（兵种不会倒立）
-- 随机旋转 (±20度)
-- 随机裁剪 + 拉伸回原尺寸 (40%)
-- 随机遮挡块 (30%，模拟战斗中部分遮挡)
-- 亮度/对比度/饱和度调整
-- 拉伸变形 (25%)
-- 轻微锐化 (20%)
+如需离线增强，可在 Kaggle 上使用 albumentations 等库进行。
 
 ### 在线增强（训练时自动应用）
 
@@ -251,8 +231,8 @@ python scripts/augment_images.py --variations 3 --dry_run
 ## 常用命令
 
 ```bash
-# 首次训练 (10类，推荐)
-python scripts/train.py --data_dir data --model efficientnet_b0 --epochs 50 --batch_size 64
+# 首次训练 (191类，含障碍物和空地)
+python scripts/train.py --data_dir data --model efficientnet_b0 --epochs 5 --batch_size 4 --device cpu --no_amp
 
 # CPU 快速验证 (5 epoch)
 python scripts/train.py --data_dir data --model efficientnet_b0 --epochs 5 --batch_size 4 --device cpu --no_amp
@@ -263,12 +243,8 @@ python scripts/train.py --data_dir data --model mobilenet_v3_large --epochs 50 -
 # 生成标注文件
 python scripts/generate_annotations.py
 
-# 数据增强 (每张图9个变体)
-python scripts/augment_images.py --input data/images --output data/augmented --variations 9
-
-# 重命名未规范的截图 (QQ截图等)
-python scripts/rename_unrenamed.py --dry-run   # 预览
-python scripts/rename_unrenamed.py             # 执行
+# 生成障碍物/空地背景数据
+python scripts/generate_background_data.py
 
 # 评估模型
 python scripts/train.py --evaluate outputs/best_efficientnet_b0.pth --data_dir data
@@ -287,27 +263,22 @@ training/
 ├── .gitignore                       # Git 忽略规则
 ├── data/
 │   ├── images/                      # 训练图片（按兵种分文件夹）
-│   │   ├── 0/  (79张)
-│   │   ├── 1/  (64张)
+│   │   ├── 157/ (Kobold)
+│   │   ├── 158/ (Kobold Foreman)
 │   │   ├── ...
-│   │   └── 9/  (64张)
+│   │   ├── 189/ (obstacle 合成)
+│   │   └── 190/ (empty 合成)
 │   └── annotations/                 # 标注文件
-│       ├── train.csv                # 训练集 (450张)
-│       ├── val.csv                  # 验证集 (97张)
-│       ├── test.csv                 # 测试集 (102张)
-│       ├── full.csv                 # 全部标注 (649张)
+│       ├── train.csv                # 训练集
+│       ├── val.csv                  # 验证集
+│       ├── test.csv                 # 测试集
+│       ├── full.csv                 # 全部标注
 │       └── summary.json             # 数据集摘要
 ├── scripts/
 │   ├── dataset.py                   # PyTorch Dataset (CPU/GPU)
 │   ├── train.py                     # 训练主脚本
-│   ├── augment_images.py            # 离线数据增强
 │   ├── generate_annotations.py      # 标注生成
-│   ├── rename_unrenamed.py          # 图片批量重命名
-│   ├── rename_images.py             # 旧版重命名（按标签匹配）
-│   ├── preprocess_screenshots.py    # 截图预处理
-│   ├── create_xlsx_mapping.py       # XLSX映射表
-│   ├── remap_labels.py              # 标签重映射
-│   └── download_bulwark_images.py   # Bulwark图片下载
+│   └── generate_background_data.py  # 障碍物/空地合成数据
 └── outputs/                         # 训练输出 (不上传git)
 ```
 
@@ -319,9 +290,9 @@ training/
 减小 `--batch_size`，例如从 64 降到 32 或 16。P100 (16GB) 上 efficientnet_b0 可安全使用 batch_size=64。
 
 ### Q2: 数据不够，每类只有几十张图？
-- 使用离线增强: `python scripts/augment_images.py --variations 9`
 - 训练时 `--label_smoothing 0.1` 减少过拟合
 - 使用较小模型 (efficientnet_b0 或 mobilenet_v3_large)
+- 在Kaggle上可使用 albumentations 等库做离线增强
 
 ### Q3: 如何继续中断的训练？
 目前版本暂不支持断点续训。建议在 Kaggle 上开启 "Save Output" 保存最佳模型。
