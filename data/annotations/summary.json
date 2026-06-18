@@ -1,9 +1,9 @@
 {
-  "total_images": 1845,
-  "num_classes": 29,
-  "train_count": 1523,
-  "val_count": 322,
-  "train_classes": 29,
-  "val_classes": 29,
-  "split_ratio": "1523:322"
+  "total_images": 7323,
+  "num_classes": 191,
+  "train_count": 5987,
+  "val_count": 1336,
+  "train_classes": 191,
+  "val_classes": 191,
+  "split_ratio": "5987:1336"
 }
