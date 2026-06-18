@@ -106,7 +106,8 @@ class AutoScreenshotCollector:
         wm = WindowManager()
         window = wm.find_game_window()
         hwnd = window.hwnd if window else 0
-        mouse = MouseController(hwnd)
+        rect = window.rect if window else (0, 0, 1062, 664)
+        mouse = MouseController(hwnd, rect)
         mouse.move_to(x, y)
         mouse.click(x, y)
 
