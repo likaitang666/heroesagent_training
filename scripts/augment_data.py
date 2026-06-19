@@ -1,11 +1,11 @@
 """数据增强脚本 — 对小样本类别进行扩充。
 
-对图片数量不足的类别进行数据增强, 使每个类别达到至少20张图片。
-增强方法: 水平翻转, 旋转(±10°), 亮度/对比度调整, 轻微平移。
+对图片数量不足的类别进行数据增强, 使每个类别达到目标图片数。
+增强方法 (遵循DESIGN.md): 高斯模糊, 亮度调整, 左右翻转 (不做上下翻转)。
 
 用法:
     python scripts/augment_data.py
-    python scripts/augment_data.py --min_count 20 --target_dir data/images
+    python scripts/augment_data.py --min_count 30 --target_dir data/images
 """
 
 import argparse
@@ -13,7 +13,7 @@ import random
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageEnhance, ImageOps
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
@@ -23,9 +23,12 @@ DEFAULT_IMAGES_DIR = PROJECT_ROOT / "data" / "images"
 def augment_image(img: Image.Image, variant: int) -> Image.Image:
     """对单张图片应用一种随机增强变换。
 
+    增强类型: 水平翻转, 高斯模糊, 亮度调整, 组合增强
+    不做垂直翻转和旋转 (兵种不会倒立/倾斜)。
+
     Args:
         img: PIL Image
-        variant: 变换变体编号 (0-7), 决定应用哪种增强
+        variant: 变换变体编号 (0-7)
 
     Returns:
         增强后的图片
@@ -36,33 +39,33 @@ def augment_image(img: Image.Image, variant: int) -> Image.Image:
         # 水平翻转
         img = ImageOps.mirror(img)
     elif variant == 1:
-        # 旋转 +5度
-        img = img.rotate(5, expand=False, fillcolor=(0, 0, 0))
+        # 轻度高斯模糊 (radius=0.8)
+        img = img.filter(ImageFilter.GaussianBlur(radius=0.8))
     elif variant == 2:
-        # 旋转 -5度
-        img = img.rotate(-5, expand=False, fillcolor=(0, 0, 0))
+        # 中度高斯模糊 (radius=1.3)
+        img = img.filter(ImageFilter.GaussianBlur(radius=1.3))
     elif variant == 3:
         # 亮度提升
         enhancer = ImageEnhance.Brightness(img)
-        img = enhancer.enhance(1.2)
+        img = enhancer.enhance(1.25)
     elif variant == 4:
         # 亮度降低
         enhancer = ImageEnhance.Brightness(img)
-        img = enhancer.enhance(0.8)
+        img = enhancer.enhance(0.75)
     elif variant == 5:
-        # 对比度提升
-        enhancer = ImageEnhance.Contrast(img)
-        img = enhancer.enhance(1.2)
+        # 翻转 + 轻度模糊
+        img = ImageOps.mirror(img)
+        img = img.filter(ImageFilter.GaussianBlur(radius=0.7))
     elif variant == 6:
-        # 翻转 + 亮度
+        # 翻转 + 亮度提升
         img = ImageOps.mirror(img)
         enhancer = ImageEnhance.Brightness(img)
-        img = enhancer.enhance(1.15)
+        img = enhancer.enhance(1.2)
     elif variant == 7:
-        # 翻转 + 对比度
+        # 翻转 + 亮度降低
         img = ImageOps.mirror(img)
-        enhancer = ImageEnhance.Contrast(img)
-        img = enhancer.enhance(1.15)
+        enhancer = ImageEnhance.Brightness(img)
+        img = enhancer.enhance(0.8)
 
     return img
 
