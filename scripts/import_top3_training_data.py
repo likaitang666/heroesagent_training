@@ -1,6 +1,6 @@
-"""从 _top3_analysis xlsx 导入选中的训练数据到对应类别目录。
+"""从 test_battlefield xlsx 导入选中的训练数据到对应类别目录。
 
-读取 imagestest/_top3_analysis/battlefield_*/ 下的 xlsx 文件，
+读取 test_battlefield/battlefield_*/ 下的 xlsx 文件，
 将"是否选作训练数据"列标记为1的行对应的裁剪图复制到
 training/data/images/{class_id}/ 目录下，按训练集命名规范重命名。
 
@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import openpyxl
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-TOPDIR = PROJECT_ROOT / "imagestest" / "_top3_analysis"
+TOPDIR = PROJECT_ROOT / "test_battlefield"
 TRAIN_IMAGES = Path(__file__).parent.parent / "data" / "images"
 
 
