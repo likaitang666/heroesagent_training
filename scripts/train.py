@@ -97,11 +97,22 @@ def train(args: argparse.Namespace) -> dict:
     print_split_summary(all_samples, train_anns, val_anns)
 
     # 保存本次分割结果 (可复现)
-    annotations_dir.mkdir(parents=True, exist_ok=True)
-    save_annotations(train_anns, annotations_dir, "train")
-    save_annotations(val_anns, annotations_dir, "val")
-    save_annotations(all_samples, annotations_dir, "full")
-    save_summary(all_samples, train_anns, val_anns, annotations_dir)
+    # Kaggle input目录只读时自动回退到 outputs/annotations/
+    save_dir = annotations_dir
+    try:
+        annotations_dir.mkdir(parents=True, exist_ok=True)
+        save_annotations(train_anns, annotations_dir, "train")
+        save_annotations(val_anns, annotations_dir, "val")
+        save_annotations(all_samples, annotations_dir, "full")
+        save_summary(all_samples, train_anns, val_anns, annotations_dir)
+    except OSError:
+        save_dir = OUTPUTS_DIR / "annotations"
+        save_dir.mkdir(parents=True, exist_ok=True)
+        print(f"[数据] [WARN] annotations目录只读, 回退保存到: {save_dir}")
+        save_annotations(train_anns, save_dir, "train")
+        save_annotations(val_anns, save_dir, "val")
+        save_annotations(all_samples, save_dir, "full")
+        save_summary(all_samples, train_anns, val_anns, save_dir)
 
     # --- 总类别数 ---
     num_classes = CreatureDataset.get_total_classes(

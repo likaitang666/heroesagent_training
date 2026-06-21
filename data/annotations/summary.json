@@ -1,50 +1,9 @@
 {
-  "total_images": 1845,
-  "num_classes": 29,
-  "classes": [
-    0,
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7,
-    8,
-    9,
-    10,
-    11,
-    12,
-    13,
-    14,
-    15,
-    16,
-    17,
-    18,
-    19,
-    20,
-    21,
-    22,
-    23,
-    24,
-    25,
-    26,
-    27,
-    28
-  ],
-  "splits": {
-    "train": {
-      "count": 1281,
-      "classes": 29
-    },
-    "val": {
-      "count": 272,
-      "classes": 29
-    },
-    "test": {
-      "count": 292,
-      "classes": 29
-    }
-  },
-  "images_dir": "data/images"
+  "total_images": 10156,
+  "num_classes": 191,
+  "train_count": 8391,
+  "val_count": 1765,
+  "train_classes": 191,
+  "val_classes": 191,
+  "split_ratio": "8391:1765"
 }
