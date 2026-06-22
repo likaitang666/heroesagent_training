@@ -1,6 +1,6 @@
 # H3HOTA Creature Classifier — 训练与检测框架
 
-英雄无敌3:深渊号角（HotA）兵种图像识别模型训练框架。基于 PyTorch + torchvision，支持 CPU/GPU/混合精度训练，专为 Kaggle Notebook 环境优化。
+英雄无敌3:深渊号角（HotA）兵种图像识别模型训练框架。基于 PyTorch + torchvision，支持 CPU/GPU/混合精度训练，兼容 Kaggle Notebook 环境。
 
 分类模型与锚框检测器联动，实现端到端的战场兵种检测：**锚框生成 → 图像裁剪 → 分类推理 → NMS后处理**。
 
@@ -24,24 +24,34 @@
 ### 本地 CPU 快速验证（5 epoch）
 
 ```bash
-python scripts/train.py --data_dir data --model mobilenet_v3_large --epochs 5 --batch_size 4 --device cpu --no_amp
+python scripts/train.py --model mobilenet_v3_large --epochs 5 --batch_size 4 --device cpu --no_amp
 ```
 
 ### GPU 完整训练
 
 ```bash
-python scripts/train.py --data_dir data --model mobilenet_v3_large --epochs 50 --batch_size 64
+python scripts/train.py --model mobilenet_v3_large --epochs 50 --batch_size 64
 ```
 
 ### 仅评估已有模型
 
 ```bash
-python scripts/train.py --evaluate outputs/best_mobilenet_v3_large.pth --data_dir data
+python scripts/train.py --evaluate outputs/best_mobilenet_v3_large.pth
+```
+
+### 指定输出目录
+
+```bash
+python scripts/train.py --output_dir ./my_outputs --epochs 10
 ```
 
 ---
 
 ## Kaggle Notebook 训练指南
+
+### 核心问题：Kaggle 只读文件系统
+
+Kaggle 的 input 数据集是只读的，训练产生的标注文件和模型无法写入 `data/annotations/` 或默认的 `outputs/`。使用 `--output_dir` 将所有输出重定向到 Kaggle 的可写工作目录即可解决。
 
 ### 环境说明
 
@@ -49,16 +59,14 @@ python scripts/train.py --evaluate outputs/best_mobilenet_v3_large.pth --data_di
 |------|-----|
 | GPU | P100 (16GB 显存) |
 | 框架 | PyTorch + torchvision |
-| 推荐模型 | **MobileNetV3-Large** (5.5M 参数) |
+| 推荐模型 | **MobileNetV3-Large** (4.4M 参数) |
 | 推荐 Batch Size | 64 (约 6GB 显存) |
 
 ### Step 1: 上传数据到 Kaggle
 
-将 `training/` 文件夹上传为 Kaggle Dataset，或直接上传到 Notebook 的 input 目录。
+将项目文件夹打包上传为 Kaggle Dataset，或直接上传到 Notebook 的 input 目录。
 
 ### Step 2: Notebook 训练代码
-
-在 Kaggle Notebook 中依次运行:
 
 ```python
 # ========== Cell 1: 环境检查 ==========
@@ -73,8 +81,11 @@ if torch.cuda.is_available():
 !pip install matplotlib openpyxl -q
 
 # ========== Cell 3: 开始训练 ==========
-!python <datasetpath>/heroesagent-training/scripts/train.py \
-    --data_dir <datasetpath>/heroesagent-training/data \
+# 关键: --output_dir /kaggle/working/ 将所有输出写到可写目录
+# --data_dir 指向只读的 input 数据集中的 data 目录
+!python <datasetpath>/<project>/scripts/train.py \
+    --data_dir <datasetpath>/<project>/data \
+    --output_dir /kaggle/working/ \
     --model mobilenet_v3_large \
     --epochs 10 \
     --batch_size 64 \
@@ -83,17 +94,18 @@ if torch.cuda.is_available():
     --early_stop 10
 ```
 
-也可以使用 Python 调用方式:
+也可以用 Python 调用:
 
 ```python
 import sys
 import argparse
-sys.path.insert(0, '<datasetpath>/heroesagent-training/scripts')
+sys.path.insert(0, '<datasetpath>/<project>/scripts')
 from train import train
 
 args = argparse.Namespace(
     model='mobilenet_v3_large',
-    data_dir='<datasetpath>/heroesagent-training/data',
+    data_dir='<datasetpath>/<project>/data',
+    output_dir='/kaggle/working/',
     epochs=10, batch_size=64, lr=3e-4,
     weight_decay=1e-4, label_smoothing=0.1,
     clip_grad=1.0, input_size=224,
@@ -105,22 +117,26 @@ history = train(args)
 print(f"Best val accuracy: {history['best_val_acc']:.2f}%")
 ```
 
+> **注意**: `<datasetpath>/<project>` 是占位符，请替换为实际路径。Kaggle input 数据集挂载路径类似 `/kaggle/input/<dataset-name>/`，文件夹名取决于上传时的命名，不是固定的 `training` 或 `heroesagent-training`。
+
 ### Step 3: 下载训练结果
 
-训练完成后，模型和图表保存在 `outputs/`:
+训练完成后，所有输出保存在 `--output_dir` 指定的目录（Kaggle 上为 `/kaggle/working/`）:
 
 | 文件 | 说明 |
 |------|------|
-| `outputs/best_{model}.pth` | 最佳模型 checkpoint |
-| `outputs/training_curves_{model}.png` | Loss/Accuracy 曲线图 |
-| `outputs/confusion_matrix_{model}.png` | 混淆矩阵 |
-| `outputs/history_{model}.json` | 训练历史数据 |
-| `outputs/eval_{model}.json` | 测试集评估结果 |
+| `best_{model}.pth` | 最佳模型 checkpoint |
+| `training_curves_{model}.png` | Loss/Accuracy 曲线图 |
+| `confusion_matrix_{model}.png` | 混淆矩阵 |
+| `history_{model}.json` | 训练历史数据 |
+| `eval_{model}.json` | 测试集评估结果 |
+| `annotations/train.csv` | 本次训练的train split |
+| `annotations/val.csv` | 本次训练的val split |
 
 打包下载:
 ```python
 import shutil
-shutil.make_archive("model_output", "zip", "outputs")
+shutil.make_archive("model_output", "zip", "/kaggle/working/")
 ```
 
 ### Kaggle P100 显存参考
@@ -140,32 +156,30 @@ shutil.make_archive("model_output", "zip", "outputs")
 
 ## 数据集说明
 
-### 当前数据（29类兵种，1845张图片）
+### 当前数据（191类兵种，10,156张图片）
 
 图片按兵种编号分文件夹组织: `data/images/{编号}/{编号}_{序号}.png`
 
-- **训练数据**: 29类兵种（编号0-28），约1845张真实游戏截图
-- **全部类别**: 模型架构支持191类（creature_index.xlsx中的全部189兵种 + 障碍物 + 空地），当前29类有训练数据
+- **训练数据**: 191类兵种，约10,156张真实游戏截图
+- **全部类别**: 模型架构支持191类（creature_index.xlsx中所有兵种 + 障碍物 + 空地）
 - **分割策略**: 每次训练动态随机分割，训练:验证 = 5:1，每类保证至少1张验证图（仅1张图时全进训练集）
 - **不使用预分配**: 训练/验证集在每次训练时重新随机生成，不使用固定CSV分割
 - **全部数据用于训练/验证**: 不预留测试集，最大化训练数据利用率
 - 图片格式: PNG，统一命名 `{兵种编号}_{序号}.png`
-- **当前各兵种图片数量**: 每类约62-79张
 
 | 数据集 | 数量(约) | 比例 |
 |--------|----------|------|
-| 训练集 | ~1523 | ~83% |
-| 验证集 | ~322 | ~17% |
+| 训练集 | ~8,463 | ~83% |
+| 验证集 | ~1,693 | ~17% |
 | 测试集 | 无 | 全部数据用于训练/验证 |
 
-### 当前训练效果（MobileNetV3-Large）
+### 当前训练效果（MobileNetV3-Large, CPU 10 Epoch）
 
 | 指标 | 值 |
 |------|-----|
-| 测试准确率 | 84.93% |
-| 最佳验证准确率 | 90.81% |
-| 训练设备 | CPU (本地验证) |
-| Epochs | 1 (仅验证流程) |
+| 最佳验证准确率 | 94.74% (Epoch 6) |
+| 训练设备 | CPU |
+| Epochs | 10 |
 
 ### 添加新数据
 
@@ -173,21 +187,17 @@ shutil.make_archive("model_output", "zip", "outputs")
 
 ```
 data/images/
-├── 0/   ← 兵种0的图片 (已存在79张)
+├── 0/   ← 兵种0的图片
 ├── 1/
 ├── ...
-└── 29/  ← 新增兵种29的图片放这里
+└── 190/  ← 新增兵种图片放这里
 ```
 
-然后重新生成标注:
-
-```bash
-python scripts/generate_annotations.py
-```
+训练脚本会自动扫描 `data/images/` 下的所有图片，无需额外步骤。
 
 ### 图片命名规范
 
-使用 `rename_images.py` 将非规范命名的图片（如QQ截图）重命名为标准格式:
+使用 `rename_images.py` 将非规范命名的图片重命名为标准格式:
 
 ```bash
 python scripts/rename_images.py
@@ -216,15 +226,14 @@ python scripts/rename_images.py
 
 | 模型 | 参数量 | Top-1 | 推理(CPU) | 推荐场景 |
 |------|--------|-------|----------|---------|
-| **mobilenet_v3_large** | **5.5M** | **75.2%** | **~18ms** | **首选**: 精度/效率最佳平衡 |
+| **mobilenet_v3_large** | **4.4M** | **75.2%** | **~18ms** | **首选**: 精度/效率最佳平衡 |
 | efficientnet_b0 | 5.3M | 77.1% | ~22ms | 精度略高，显存需求大 |
 | mobilenet_v3_small | 2.5M | 67.4% | ~10ms | 极致轻量，CPU优先 |
 | shufflenet_v2_x1_0 | 2.3M | 69.4% | ~8ms | ARM/移动端 |
 | resnet18 | 11.7M | 69.8% | ~28ms | 训练最稳定 |
 | resnet34 | 21.8M | 73.3% | ~45ms | 精度略高 |
 
-> **默认模型**: `mobilenet_v3_large` — 在P100上约15-20分钟完成50 epoch。
-> 在29类兵种上测试准确率84.93%，验证准确率90.81%。
+> **默认模型**: `mobilenet_v3_large` — 在191类兵种上验证准确率94.74%。
 
 ---
 
@@ -233,7 +242,8 @@ python scripts/rename_images.py
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `--model` | `mobilenet_v3_large` | torchvision 模型名 |
-| `--data_dir` | `training/data` | 数据目录（含 images/ 和 annotations/） |
+| `--data_dir` | `data` | 数据目录（含 images/ 子目录） |
+| `--output_dir` | `outputs` | 输出目录（模型/标注/图表）。Kaggle上设为 `/kaggle/working/` |
 | `--epochs` | 50 | 训练轮数 |
 | `--batch_size` | 64 | 批次大小（GPU: 64, CPU: 4-16） |
 | `--lr` | 3e-4 | 初始学习率 |
@@ -243,6 +253,7 @@ python scripts/rename_images.py
 | `--input_size` | 224 | 模型输入尺寸 |
 | `--device` | auto | auto/cpu/cuda |
 | `--num_workers` | 2 | DataLoader 工作进程数 |
+| `--seed` | None | 随机种子 (None=每次不同) |
 | `--early_stop` | 10 | Early Stopping 耐心值 (0=关闭) |
 | `--warmup_epochs` | 3 | 学习率 warmup 轮数 |
 | `--no_pretrain` | False | 不使用预训练权重 |
@@ -341,7 +352,7 @@ from backend.app.battlefield.battlefield_detector import BattlefieldDetector
 
 # 初始化检测器
 detector = BattlefieldDetector(
-    model_path="training/outputs/best_mobilenet_v3_large.pth",
+    model_path="outputs/best_mobilenet_v3_large.pth",
     confidence_threshold=0.70,
     same_class_distance=1,
 )
@@ -361,6 +372,15 @@ bf_map = detector.detect_to_battlefield_map("screenshot.png")
 # 生成叠加图（调试用）
 from backend.app.battlefield.battlefield_detector import draw_detection_overlay
 draw_detection_overlay("screenshot.png", result, "overlay.png")
+
+# 批量战场分析
+python -c "
+from backend.app.battlefield.battlefield_detector import BattlefieldDetector
+detector = BattlefieldDetector(model_path='outputs/best_mobilenet_v3_large.pth')
+detector.load_tile_map()
+for i in range(1, 71):
+    detector.detect_three_stage(f'images_battlefield/battlefield_{i}.png')
+"
 ```
 
 ### CPU 延迟估算（638锚框）
@@ -376,37 +396,34 @@ draw_detection_overlay("screenshot.png", result, "overlay.png")
 ## 常用命令
 
 ```bash
-# 默认训练 (MobileNetV3-Large, 29类, 动态5:1分割)
-python scripts/train.py --data_dir data --model mobilenet_v3_large --epochs 50 --batch_size 64
+# 默认训练 (MobileNetV3-Large, 191类, 动态5:1分割)
+python scripts/train.py --model mobilenet_v3_large --epochs 50 --batch_size 64
 
 # CPU 快速验证 (5 epoch, 固定随机种子可复现)
-python scripts/train.py --data_dir data --model mobilenet_v3_large --epochs 5 --batch_size 4 --device cpu --no_amp --seed 42
+python scripts/train.py --model mobilenet_v3_large --epochs 5 --batch_size 4 --device cpu --no_amp --seed 42
 
 # 轻量模型 (CPU推理优先)
-python scripts/train.py --data_dir data --model mobilenet_v3_small --epochs 50 --batch_size 128
+python scripts/train.py --model mobilenet_v3_small --epochs 50 --batch_size 128
 
-# 生成完整标注文件
-python scripts/generate_annotations.py
+# Kaggle 训练 (输出写到可写目录)
+python scripts/train.py --data_dir <datasetpath>/<project>/data --output_dir /kaggle/working/ --epochs 10 --batch_size 64
 
-# 规范命名图片
-python scripts/rename_images.py
-
-# 评估模型 (使用动态随机验证集)
-python scripts/train.py --evaluate outputs/best_mobilenet_v3_large.pth --data_dir data
+# 评估模型
+python scripts/train.py --evaluate outputs/best_mobilenet_v3_large.pth
 
 # 导出 ONNX 模型
 python scripts/train.py --export_onnx outputs/best_mobilenet_v3_large.pth
 
+# 规范命名图片
+python scripts/rename_images.py
+
 # 锚框生成器测试
 python backend/app/battlefield/test_anchor_detector.py
 
-# 检测器测试（无模型，验证框架）
-python backend/app/battlefield/battlefield_detector.py
-
-# 检测器测试（加载模型）
+# 检测器单图测试
 python backend/app/battlefield/battlefield_detector.py \
     --image screenshot.png \
-    --model training/outputs/best_mobilenet_v3_large.pth \
+    --model outputs/best_mobilenet_v3_large.pth \
     --output result_overlay.png
 
 # 锚框导出为JSON
@@ -422,36 +439,35 @@ python backend/app/battlefield/battlefield_detector.py --latency
 ## 项目结构
 
 ```
-training/
+<project_root>/                      # 项目根目录 (名称可变，不固定为training)
 ├── README.md                        # 本文件
 ├── .gitignore                       # Git 忽略规则
 ├── data/
-│   ├── images/                      # 训练图片（按兵种分文件夹，29类）
-│   │   ├── 0/  (79张)
-│   │   ├── 1/  (64张)
+│   ├── images/                      # 训练图片（按兵种分文件夹，191类）
+│   │   ├── 0/ 
+│   │   ├── 1/ 
 │   │   ├── ...
-│   │   └── 28/ (63张)
-│   └── annotations/                 # 标注文件
-│       ├── full.csv                 # 完整标注 (动态分割的输入)
+│   │   └── 190/ 
+│   └── annotations/                 # 标注文件（训练时自动生成）
 │       ├── train.csv                # 最近一次训练的train split
 │       ├── val.csv                  # 最近一次训练的val split
-│       ├── summary.json             # 数据集摘要
 │       └── creature_index.xlsx      # 全兵种索引 (191类)
 ├── scripts/
-│   ├── dataset.py                   # PyTorch Dataset (CSV/内存双模式)
+│   ├── train.py                     # 训练主脚本 (CLI+编排+评估+导出)
+│   ├── train_loop.py                # 训练/验证循环 (train_epoch, validate_epoch)
+│   ├── dataset.py                   # PyTorch Dataset + 在线数据增强
 │   ├── data_processor.py            # 数据发现 + 动态随机分割 (5:1)
 │   ├── model_factory.py             # 模型构建 (build_model)
-│   ├── train_loop.py                # 训练/验证循环 (train_epoch, validate_epoch)
-│   ├── train.py                     # 训练主脚本 (CLI+编排+评估+导出)
-│   ├── generate_annotations.py      # 完整标注生成
-│   └── rename_images.py             # 图片重命名 (规范格式)
+│   ├── rename_images.py             # 图片重命名 (规范格式)
+│   ├── import_top3_training_data.py # 从xlsx标记导入训练数据
+│   └── auto_screenshot.py           # 自动截图采集训练数据
 └── outputs/                         # 训练输出 (不上传git)
-    ├── best_mobilenet_v3_large.pth   # 最佳模型 (~51MB)
+    ├── best_mobilenet_v3_large.pth   # 最佳模型 (~22MB)
     ├── training_curves_*.png         # 训练曲线图
     ├── history_*.json                # 训练历史
     └── eval_*.json                   # 评估结果
 
-backend/app/battlefield/             # 战场检测模块 (与training联动)
+backend/app/battlefield/             # 战场检测模块 (与训练模块联动)
 ├── anchor_generator.py              # 锚框生成器 (638个锚框)
 ├── battlefield_detector.py          # 战场检测器 (分类+NMS)
 └── test_anchor_detector.py          # 检测系统测试
@@ -464,10 +480,8 @@ backend/app/battlefield/             # 战场检测模块 (与training联动)
 ### Q1: CUDA out of memory
 减小 `--batch_size`，例如从 64 降到 32 或 16。P100 (16GB) 上 mobilenet_v3_large 可安全使用 batch_size=64（约6GB显存）。
 
-### Q2: 数据不够，每类只有几十张图？
-- 训练时 `--label_smoothing 0.1` 减少过拟合
-- 使用较小模型 (mobilenet_v3_large 或 mobilenet_v3_small)
-- 当前29类兵种每类62-79张，总计1845张，已验证可达到84.93%测试准确率
+### Q2: Kaggle 上报 Read-only file system 错误？
+使用 `--output_dir /kaggle/working/` 将所有输出（标注、模型、图表）重定向到可写目录。详见 [Kaggle Notebook 训练指南](#kaggle-notebook-训练指南)。
 
 ### Q3: 如何继续中断的训练？
 目前版本暂不支持断点续训。建议在 Kaggle 上开启 "Save Output" 保存最佳模型。
@@ -480,14 +494,12 @@ backend/app/battlefield/             # 战场检测模块 (与training联动)
 
 ### Q5: 新增兵种类别后如何操作？
 1. 将新兵种图片按编号放入 `data/images/{新编号}/`
-2. 运行: `python scripts/generate_annotations.py`
-3. 训练时模型自动适配 creature_index.xlsx 中的类别数
+2. 直接训练即可，train.py 会自动扫描所有图片并适配 creature_index.xlsx 中的类别数
 
 ### Q6: 验证集准确率不提升？
 - 检查图片是否按兵种正确分文件夹
 - 尝试减小学习率: `--lr 1e-4`
 - 增加 warmup: `--warmup_epochs 5`
-- 使用离线数据增强扩充训练集
 
 ### Q7: 检测器输出太多/太少检测框？
 - **太多**: 提高 `confidence_threshold`（如 0.80），开启 `same_class_distance=1`
@@ -503,4 +515,4 @@ backend/app/battlefield/             # 战场检测模块 (与training联动)
 - 比例: 训练:验证 = 5:1（约83%训练，17%验证）
 - 每类保证至少1张进验证集（仅1张图时全进训练集）
 - 如需固定分割复现结果，使用 `--seed 42` 参数
-- 分割结果保存在 `data/annotations/train.csv` 和 `val.csv`（每次训练覆盖）
+- 分割结果保存在 `--output_dir` 指定的 annotations/ 目录下

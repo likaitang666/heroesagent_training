@@ -37,6 +37,9 @@ Thumbs.db
 .DS_Store
 desktop.ini
 
+# Log files
+*.log
+
 # IDE
 .vscode/
 .idea/

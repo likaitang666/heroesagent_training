@@ -55,6 +55,32 @@ IMAGES_DIR = DEFAULT_DATA_DIR / "images"
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
 
+def _setup_log(log_file: Optional[str]) -> object:
+    """设置日志双写 (stdout + 文件), 返回文件句柄供最后关闭。"""
+    if not log_file:
+        return None
+    f = open(log_file, "w", encoding="utf-8", buffering=1)
+    orig_stdout = sys.stdout
+    orig_stderr = sys.stderr
+
+    class _Tee:
+        def __init__(self, orig, file_):
+            self.orig = orig
+            self.file = file_
+        def write(self, s):
+            self.orig.write(s)
+            self.orig.flush()
+            self.file.write(s)
+            self.file.flush()
+        def flush(self):
+            self.orig.flush()
+            self.file.flush()
+
+    sys.stdout = _Tee(orig_stdout, f)
+    sys.stderr = _Tee(orig_stderr, f)
+    return f
+
+
 # ============================================================
 # 主训练函数
 # ============================================================
@@ -67,6 +93,9 @@ def train(args: argparse.Namespace) -> dict:
       2. 按5:1随机分割训练/验证集 (每类保证验证≥1)
       3. 构建模型并训练
     """
+    # --- 日志 ---
+    log_handle = _setup_log(getattr(args, "log_file", None))
+
     # --- 设备 ---
     if args.device == "cpu":
         device = torch.device("cpu")
@@ -97,7 +126,8 @@ def train(args: argparse.Namespace) -> dict:
     print_split_summary(all_samples, train_anns, val_anns)
 
     # 保存本次分割结果 (可复现)
-    # Kaggle input目录只读时自动回退到 outputs/annotations/
+    # Kaggle input目录只读时自动回退到 output_dir/annotations/
+    output_dir = Path(args.output_dir)
     save_dir = annotations_dir
     try:
         annotations_dir.mkdir(parents=True, exist_ok=True)
@@ -106,7 +136,7 @@ def train(args: argparse.Namespace) -> dict:
         save_annotations(all_samples, annotations_dir, "full")
         save_summary(all_samples, train_anns, val_anns, annotations_dir)
     except OSError:
-        save_dir = OUTPUTS_DIR / "annotations"
+        save_dir = output_dir / "annotations"
         save_dir.mkdir(parents=True, exist_ok=True)
         print(f"[数据] [WARN] annotations目录只读, 回退保存到: {save_dir}")
         save_annotations(train_anns, save_dir, "train")
@@ -189,8 +219,8 @@ def train(args: argparse.Namespace) -> dict:
     }
 
     best_val_acc = 0.0
-    best_model_path = OUTPUTS_DIR / f"best_{args.model}.pth"
-    OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+    best_model_path = output_dir / f"best_{args.model}.pth"
+    output_dir.mkdir(parents=True, exist_ok=True)
     patience_counter = 0
 
     print(f"\n[训练] 开始训练 ({args.epochs} epochs)...")
@@ -257,12 +287,15 @@ def train(args: argparse.Namespace) -> dict:
     print(f"[训练] 模型: {best_model_path}")
 
     # 保存训练历史
-    history_path = OUTPUTS_DIR / f"history_{args.model}.json"
+    history_path = output_dir / f"history_{args.model}.json"
     with open(history_path, "w", encoding="utf-8") as f:
         json.dump(history, ensure_ascii=False, indent=2, fp=f)
 
     # 生成图表
-    plot_training_curves(history, args.model)
+    plot_training_curves(history, args.model, output_dir)
+
+    if log_handle:
+        log_handle.close()
 
     return history
 
@@ -271,8 +304,11 @@ def train(args: argparse.Namespace) -> dict:
 # 图表生成
 # ============================================================
 
-def plot_training_curves(history: dict, model_name: str) -> None:
+def plot_training_curves(history: dict, model_name: str,
+                        output_dir: Optional[Path] = None) -> None:
     """生成 loss-epoch 和 accuracy-epoch 图。"""
+    if output_dir is None:
+        output_dir = OUTPUTS_DIR
     try:
         import matplotlib
         matplotlib.use("Agg")
@@ -315,7 +351,7 @@ def plot_training_curves(history: dict, model_name: str) -> None:
         ax2.grid(True, alpha=0.3)
 
         plt.tight_layout()
-        output_path = OUTPUTS_DIR / f"training_curves_{model_name}.png"
+        output_path = output_dir / f"training_curves_{model_name}.png"
         plt.savefig(output_path, dpi=150, bbox_inches="tight")
         plt.close()
         print(f"[训练] 图表已保存: {output_path}")
@@ -332,8 +368,11 @@ def plot_training_curves(history: dict, model_name: str) -> None:
 def evaluate_model(
     model_path: str, model_name: str, device: torch.device,
     input_size: int = 224, data_dir: str = "",
+    output_dir: Optional[Path] = None,
 ) -> dict:
     """在验证集上评估已训练模型, 生成混淆矩阵。"""
+    if output_dir is None:
+        output_dir = OUTPUTS_DIR
     ddir = Path(data_dir) if data_dir else DEFAULT_DATA_DIR
     images_dir = ddir / "images"
 
@@ -379,21 +418,25 @@ def evaluate_model(
     }
     print(f"[评估] 验证准确率: {acc:.2f}% ({correct}/{total})")
 
-    result_path = OUTPUTS_DIR / f"eval_{model_name}.json"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    result_path = output_dir / f"eval_{model_name}.json"
     with open(result_path, "w", encoding="utf-8") as f:
         json.dump(result, ensure_ascii=False, indent=2, fp=f)
 
     if total >= 10 and len(set(all_labels)) >= 3:
         try:
-            plot_confusion_matrix(all_labels, all_preds, model_name)
+            plot_confusion_matrix(all_labels, all_preds, model_name, output_dir)
         except Exception as e:
             print(f"[评估] 混淆矩阵生成失败: {e}")
 
     return result
 
 
-def plot_confusion_matrix(labels: list[int], preds: list[int], model_name: str) -> None:
+def plot_confusion_matrix(labels: list[int], preds: list[int], model_name: str,
+                         output_dir: Optional[Path] = None) -> None:
     """生成混淆矩阵图。"""
+    if output_dir is None:
+        output_dir = OUTPUTS_DIR
     try:
         import matplotlib
         matplotlib.use("Agg")
@@ -419,7 +462,7 @@ def plot_confusion_matrix(labels: list[int], preds: list[int], model_name: str) 
         ax.set_title(f"Confusion Matrix - {model_name}")
         plt.colorbar(im, ax=ax)
         plt.tight_layout()
-        cm_path = OUTPUTS_DIR / f"confusion_matrix_{model_name}.png"
+        cm_path = output_dir / f"confusion_matrix_{model_name}.png"
         plt.savefig(cm_path, dpi=150, bbox_inches="tight")
         plt.close()
         print(f"[评估] 混淆矩阵: {cm_path}")
@@ -433,16 +476,20 @@ def plot_confusion_matrix(labels: list[int], preds: list[int], model_name: str) 
 # ============================================================
 
 def export_onnx(model_path: str, model_name: str,
-                output_path: Optional[str] = None) -> str:
+                output_path: Optional[str] = None,
+                output_dir: Optional[Path] = None) -> str:
     """导出模型为ONNX格式。
 
     Args:
         model_path: .pth checkpoint路径
         model_name: torchvision模型名
-        output_path: 输出ONNX路径 (默认: outputs/{model_name}.onnx)
+        output_path: 输出ONNX路径 (默认: output_dir/{model_name}.onnx)
+        output_dir: 输出目录 (默认: OUTPUTS_DIR)
     """
+    if output_dir is None:
+        output_dir = OUTPUTS_DIR
     if output_path is None:
-        output_path = str(OUTPUTS_DIR / f"{model_name}.onnx")
+        output_path = str(output_dir / f"{model_name}.onnx")
 
     checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
     num_classes = checkpoint.get("history", {}).get("num_classes", 191)
@@ -472,6 +519,9 @@ def parse_args() -> argparse.Namespace:
                         help="torchvision模型名 (默认: mobilenet_v3_large)")
     parser.add_argument("--data_dir", type=str, default=str(DEFAULT_DATA_DIR),
                         help=f"数据目录路径 (默认: {DEFAULT_DATA_DIR})")
+    parser.add_argument("--output_dir", type=str, default=str(OUTPUTS_DIR),
+                        help=f"输出目录 (模型/标注/图表). "
+                             f"Kaggle上应设为 /kaggle/working/ (默认: {OUTPUTS_DIR})")
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--lr", type=float, default=3e-4)
@@ -492,16 +542,20 @@ def parse_args() -> argparse.Namespace:
                         help="仅评估: 指定模型.pth路径")
     parser.add_argument("--export_onnx", type=str, default=None,
                         help="导出ONNX: 指定模型.pth路径")
+    parser.add_argument("--log_file", type=str, default=None,
+                        help="训练日志输出路径 (同时输出到stdout和文件)")
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
+    output_dir = Path(args.output_dir)
 
     if args.export_onnx:
-        export_onnx(args.export_onnx, args.model)
+        export_onnx(args.export_onnx, args.model, output_dir=output_dir)
     elif args.evaluate:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        evaluate_model(args.evaluate, args.model, device, args.input_size, args.data_dir)
+        evaluate_model(args.evaluate, args.model, device,
+                       args.input_size, args.data_dir, output_dir=output_dir)
     else:
         train(args)
