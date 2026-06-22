@@ -53,6 +53,32 @@ IMAGES_DIR = DEFAULT_DATA_DIR / "images"
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
 
+def _setup_log(log_file: Optional[str]) -> object:
+    """设置日志双写 (stdout + 文件), 返回文件句柄供最后关闭。"""
+    if not log_file:
+        return None
+    f = open(log_file, "w", encoding="utf-8", buffering=1)
+    orig_stdout = sys.stdout
+    orig_stderr = sys.stderr
+
+    class _Tee:
+        def __init__(self, orig, file_):
+            self.orig = orig
+            self.file = file_
+        def write(self, s):
+            self.orig.write(s)
+            self.orig.flush()
+            self.file.write(s)
+            self.file.flush()
+        def flush(self):
+            self.orig.flush()
+            self.file.flush()
+
+    sys.stdout = _Tee(orig_stdout, f)
+    sys.stderr = _Tee(orig_stderr, f)
+    return f
+
+
 # ============================================================
 # 主训练函数
 # ============================================================
@@ -65,6 +91,9 @@ def train(args: argparse.Namespace) -> dict:
       2. 按5:1随机分割训练/验证集 (每类保证验证≥1)
       3. 构建模型并训练
     """
+    # --- 日志 ---
+    log_handle = _setup_log(getattr(args, "log_file", None))
+
     # --- 设备 ---
     if args.device == "cpu":
         device = torch.device("cpu")
@@ -262,6 +291,9 @@ def train(args: argparse.Namespace) -> dict:
 
     # 生成图表
     plot_training_curves(history, args.model, output_dir)
+
+    if log_handle:
+        log_handle.close()
 
     return history
 
@@ -507,6 +539,8 @@ def parse_args() -> argparse.Namespace:
                         help="仅评估: 指定模型.pth路径")
     parser.add_argument("--export_onnx", type=str, default=None,
                         help="导出ONNX: 指定模型.pth路径")
+    parser.add_argument("--log_file", type=str, default=None,
+                        help="训练日志输出路径 (同时输出到stdout和文件)")
     return parser.parse_args()
 
 
