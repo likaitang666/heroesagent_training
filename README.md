@@ -57,10 +57,13 @@ Kaggle 的 input 数据集是只读的，训练产生的标注文件和模型无
 
 | 项目 | 值 |
 |------|-----|
-| GPU | P100 (16GB 显存) |
-| 框架 | PyTorch + torchvision |
+| GPU | P100 (16GB 显存, sm_60) |
+| 框架 | PyTorch + torchvision (CUDA 11.8) |
 | 推荐模型 | **MobileNetV3-Large** (4.4M 参数) |
 | 推荐 Batch Size | 64 (约 6GB 显存) |
+
+> **重要**: P100 显卡使用 sm_60 架构, Kaggle 默认的 PyTorch (CUDA 12.x) 已不再支持。
+> 必须在训练前安装 CUDA 11.8 版本的 PyTorch, 详见下方 Cell 2。
 
 ### Step 1: 上传数据到 Kaggle
 
@@ -78,6 +81,8 @@ if torch.cuda.is_available():
     print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
 # ========== Cell 2: 安装依赖 ==========
+# P100 (sm_60) 必须使用 CUDA 11.8 版本的 PyTorch
+!pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118 -q
 !pip install matplotlib openpyxl -q
 
 # ========== Cell 3: 开始训练 ==========
@@ -479,6 +484,15 @@ backend/app/battlefield/             # 战场检测模块 (与训练模块联动
 
 ### Q1: CUDA out of memory
 减小 `--batch_size`，例如从 64 降到 32 或 16。P100 (16GB) 上 mobilenet_v3_large 可安全使用 batch_size=64（约6GB显存）。
+
+### Q1.5: `CUDA error: no kernel image is available for execution on the device`
+**PyTorch 版本不支持 P100 (sm_60) 架构。** Kaggle 默认 PyTorch (CUDA 12.x) 已移除对旧显卡的兼容。
+
+**解决方案**: 安装 CUDA 11.8 版本:
+```bash
+!pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+```
+CUDA 11.8 仍支持 sm_60 (P100)。训练脚本已内置兼容性检测, 如未安装正确版本会自动回退 CPU 并提示此命令。
 
 ### Q2: Kaggle 上报 Read-only file system 错误？
 使用 `--output_dir /kaggle/working/` 将所有输出（标注、模型、图表）重定向到可写目录。详见 [Kaggle Notebook 训练指南](#kaggle-notebook-训练指南)。

@@ -183,6 +183,23 @@ def train(args: argparse.Namespace) -> dict:
     print(f"[训练] 模型: {args.model}, "
           f"可训练参数: {trainable_params:,} / 总参数: {total_params:,}")
 
+    # --- GPU兼容性验证 (Kaggle P100 sm_60兼容) ---
+    if device.type == "cuda":
+        try:
+            test_input = torch.randn(
+                1, 3, args.input_size, args.input_size, device=device
+            )
+            _ = model(test_input)
+        except RuntimeError as e:
+            if "no kernel image" in str(e) or "CUDA error" in str(e):
+                print(f"[训练] [WARN] GPU CUDA架构不兼容，回退到CPU")
+                print(f"[训练] 原因: PyTorch版本不支持当前GPU (P100=sm_60)")
+                print(f"[训练] 修复: pip install torch torchvision "
+                      f"--index-url https://download.pytorch.org/whl/cu118")
+                device = torch.device("cpu")
+                model = model.to(device)
+                use_amp = False
+
     # --- 优化器 & 调度器 ---
     criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
     optimizer = optim.AdamW(
